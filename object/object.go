@@ -1,7 +1,10 @@
 package object
 
 import (
+	"bytes"
 	"fmt"
+	"pir-interpreter/ast"
+	"strings"
 )
 
 const (
@@ -11,6 +14,8 @@ const (
 	MAYBE_OBJ       = "MAYBE"
 	GIVES_VALUE_OBJ = "GIVES_VALUE"
 	ERROR_OBJ       = "ERROR"
+	FUNCTION_OBJ    = "FUNCTION"
+	STRING_OBJ      = "STRING"
 )
 
 type ObjectType string
@@ -70,3 +75,32 @@ func IsError(obj Object) bool {
 	}
 	return false
 }
+
+type Function struct {
+	Params []*ast.Identifier
+	Body   *ast.BlockStatement
+	NS     *Namespace
+}
+
+func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
+func (f *Function) Inspect() string {
+	var out bytes.Buffer
+	params := []string{}
+	for _, p := range f.Params {
+		params = append(params, p.String())
+	}
+	out.WriteString("f")
+	out.WriteString("(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") :\n")
+	out.WriteString(f.Body.String())
+	out.WriteString("\n.")
+	return out.String()
+}
+
+type String struct {
+	Value string
+}
+
+func (s *String) Type() ObjectType { return STRING_OBJ }
+func (s *String) Inspect() string  { return s.Value }

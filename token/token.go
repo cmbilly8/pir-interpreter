@@ -39,6 +39,7 @@ const (
 	OR      = "OR"
 	TRUE    = "TRUE"
 	FALSE   = "FALSE"
+	STRING  = "STRING"
 )
 
 type TokenType string

@@ -60,8 +60,6 @@ func (l *Lexer) NextToken() token.Token {
 		currentToken = l.newToken(token.EQUAL, "=")
 	case ',':
 		currentToken = l.newToken(token.COMMA, ",")
-	case '\'':
-		currentToken = l.newToken(token.SQUOTE, "'")
 	case '.':
 		currentToken = l.newToken(token.PERIOD, ".")
 	case ';':
@@ -76,6 +74,9 @@ func (l *Lexer) NextToken() token.Token {
 		currentToken = l.newToken(token.LBRACE, "{")
 	case '}':
 		currentToken = l.newToken(token.RBRACE, "}")
+	case '\'', '"':
+		str := l.readString()
+		currentToken = l.newToken(token.STRING, str)
 	case 0:
 		currentToken = l.newToken(token.EOF, "")
 	default:
@@ -92,6 +93,17 @@ func (l *Lexer) NextToken() token.Token {
 	}
 	l.readChar()
 	return currentToken
+}
+
+func (l *Lexer) readString() string {
+	// Could be either ' or "
+	endQuote := l.ch
+	l.readChar()
+	start := l.position
+	for l.ch != byte(endQuote) && l.ch != 0 {
+		l.readChar()
+	}
+	return l.input[start:l.position]
 }
 
 func (l *Lexer) ignoreComment() {

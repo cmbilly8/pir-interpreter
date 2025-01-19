@@ -47,6 +47,8 @@ func (p *Parser) resolvePrefixParseFunc(tok token.TokenType) prefixParseFunc {
 		return p.parseGroupedExpression
 	case token.F:
 		return p.parseFunctionLiteral
+	case token.STRING:
+		return p.parseStringLiteral
 	default:
 		return nil
 	}
@@ -136,6 +138,10 @@ func (p *Parser) parseStatement() ast.Statement {
 
 func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseStringLiteral() ast.Expression {
+	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 }
 
 func (p *Parser) parseBoolean() ast.Expression {
@@ -247,7 +253,6 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 		p.advanceTokens()
 		currConditional.Condition = p.parseExpression(token.LOWEST)
 		if !p.expectPeekToken(token.COLOGNE) {
-			p.printCurrentTok()
 			return nil
 		}
 		p.advanceTokens()
@@ -266,14 +271,6 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 	}
 
 	return statement
-}
-
-func (p *Parser) printCurrentTok() {
-	fmt.Printf("Current token is %s \n", p.curToken)
-}
-
-func (p *Parser) printPeekTok() {
-	fmt.Printf("Peek token is %s \n", p.curToken)
 }
 
 func (p *Parser) parseYarStatement() *ast.YarStatement {

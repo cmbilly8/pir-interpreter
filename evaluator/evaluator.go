@@ -37,9 +37,76 @@ func Eval(node ast.Node, ns *object.Namespace) object.Object {
 		return evalGivesStatementNode(node, ns)
 	case *ast.YarStatement:
 		return evalYarStatementNode(node, ns)
+	case *ast.FunctionLiteral:
+		return evalFuncLiteral(node, ns)
+	case *ast.CallExpression:
+		return evalFuncCall(node, ns)
+	case *ast.StringLiteral:
+		return nativeStringToStringObj(node.Value)
 	}
 	return MT
 
+}
+
+func nativeStringToStringObj(str string) object.Object {
+	return &object.String{Value: str}
+}
+
+func evalFuncCall(node *ast.CallExpression, ns *object.Namespace) object.Object {
+	f := Eval(node.Function, ns)
+	if object.IsError(f) {
+		return f
+	}
+	args := evalExpressions(node.Arguments, ns)
+	if len(args) == 1 && object.IsError(args[0]) {
+		return args[0]
+	}
+	return callFunc(f, args)
+}
+
+func callFunc(f object.Object, args []object.Object) object.Object {
+	function, ok := f.(*object.Function)
+	if !ok {
+		return newError("Not a function: %s", f.Type())
+	}
+	localNS := newLocalNamespace(function, args)
+	result := Eval(function.Body, localNS)
+	return extractGivesValue(result)
+}
+
+func newLocalNamespace(f *object.Function, args []object.Object) *object.Namespace {
+	localNS := object.NewNestedNamespace(f.NS)
+	for i, param := range f.Params {
+		localNS.Set(param.Value, args[i])
+	}
+	return localNS
+}
+
+func extractGivesValue(obj object.Object) object.Object {
+	if givesValue, ok := obj.(*object.GivesValue); ok {
+		return givesValue.Value
+	}
+	return obj
+
+}
+
+func evalExpressions(exps []ast.Expression, ns *object.Namespace) []object.Object {
+	var objs []object.Object
+	// Can't wait until I forget about this
+	for i := len(exps) - 1; i >= 0; i-- {
+		evaluated := Eval(exps[i], ns)
+		if object.IsError(evaluated) {
+			return []object.Object{evaluated}
+		}
+		objs = append(objs, evaluated)
+	}
+	return objs
+}
+
+func evalFuncLiteral(node *ast.FunctionLiteral, ns *object.Namespace) object.Object {
+	params := node.Params
+	body := node.Body
+	return &object.Function{Params: params, NS: ns, Body: body}
 }
 
 func evalIdentifier(node *ast.Identifier, ns *object.Namespace) object.Object {
@@ -124,6 +191,8 @@ func evalInfixExpressionNode(node *ast.InfixExpression, ns *object.Namespace) ob
 		return evalIntInfixExpression(left, node.Operator, right)
 	case left.Type() == object.BOOL_OBJ && right.Type() == object.BOOL_OBJ:
 		return evalBoolInfixExpression(left, node.Operator, right)
+	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
+		return evalStringInfixExpression(left, node.Operator, right)
 	case left.Type() != right.Type():
 		return newError("type mismatch: %s %s %s",
 			left.Type(), node.Operator, right.Type())
@@ -141,6 +210,23 @@ func evalBoolInfixExpression(left object.Object, operator string, right object.O
 		return nativeBoolToBoolObj(left == right)
 	case "!=":
 		return nativeBoolToBoolObj(left != right)
+	default:
+		return newError("unknown operator: %s %s %s",
+			left.Type(), operator, right.Type())
+	}
+}
+
+func evalStringInfixExpression(left object.Object, operator string, right object.Object) object.Object {
+	leftVal := left.(*object.String).Value
+	rightVal := right.(*object.String).Value
+
+	switch operator {
+	case "+":
+		return nativeStringToStringObj(leftVal + rightVal)
+	case "=":
+		return nativeBoolToBoolObj(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBoolObj(leftVal != rightVal)
 	default:
 		return newError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())

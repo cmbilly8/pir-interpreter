@@ -345,7 +345,7 @@ func evalBlockStatement(bs *ast.BlockStatement, ns *object.Namespace) object.Obj
 		result = Eval(statement, ns)
 		if result != nil {
 			rt := result.Type()
-			if rt == object.GIVES_VALUE_OBJ || rt == object.ERROR_OBJ {
+			if rt == object.GIVES_VALUE_OBJ || rt == object.ERROR_OBJ || rt == object.BREAK_OBJ {
 				return result
 			}
 		}

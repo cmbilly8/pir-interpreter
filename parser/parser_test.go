@@ -19,6 +19,13 @@ func printErrors(t *testing.T, p *Parser) {
 	t.FailNow()
 }
 
+func parseProgramFromInput(input string) (*ast.Program, *Parser) {
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	return program, p
+}
+
 func TestYarStatements(t *testing.T) {
 	tests := []struct {
 		input              string
@@ -30,9 +37,7 @@ func TestYarStatements(t *testing.T) {
 		{"yar foobar be y.", "foobar", "y"},
 	}
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 		if len(program.Statements) != 1 {
 			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
@@ -49,6 +54,81 @@ func TestYarStatements(t *testing.T) {
 	}
 }
 
+func TestIndexAssignStatements(t *testing.T) {
+	tests := []struct {
+		input                        string
+		expectedCollectionIdentifier string
+		expectedIndex                any
+		expectedValue                any
+	}{
+		{"x['1'] be 5.", "x", "1", 5},
+		{"b[1] be '3'.", "b", 1, "3"},
+	}
+	for _, tt := range tests {
+		program, p := parseProgramFromInput(tt.input)
+		printErrors(t, p)
+		if len(program.Statements) != 1 {
+			t.Fatalf("program.Statements does not contain 1 statement. got=%d",
+				len(program.Statements))
+		}
+
+		stmt, ok := program.Statements[0].(*ast.IndexAssignment)
+		if !ok {
+			t.Fatalf("program.Statements[0] is not an ast.IndexAssignment, got=%T", program.Statements[0])
+		}
+
+		id, ok := stmt.Left.(*ast.Identifier)
+		if !ok {
+			t.Fatalf("stmt.Left is not an ast.Identifier, got=%T", stmt.Left)
+		}
+		if id.Value != tt.expectedCollectionIdentifier {
+			t.Fatalf("IndexAssignment collection identifier not %q, got=%q", tt.expectedCollectionIdentifier, id.Value)
+		}
+
+		switch index := stmt.Index.(type) {
+		case *ast.IntegerLiteral:
+			expectedIndex, ok := tt.expectedIndex.(int)
+			if !ok {
+				t.Fatalf("Expected index type mismatch: expected int, got %T", tt.expectedIndex)
+			}
+			if index.Value != int64(expectedIndex) {
+				t.Fatalf("Expected index to be %d, got %d", expectedIndex, index.Value)
+			}
+		case *ast.StringLiteral:
+			expectedIndex, ok := tt.expectedIndex.(string)
+			if !ok {
+				t.Fatalf("Expected index type mismatch: expected string, got %T", tt.expectedIndex)
+			}
+			if index.Value != expectedIndex {
+				t.Fatalf("Expected index to be %q, got %q", expectedIndex, index.Value)
+			}
+		default:
+			t.Fatalf("Unexpected index type, got=%T", stmt.Index)
+		}
+
+		switch v := stmt.Value.(type) {
+		case *ast.IntegerLiteral:
+			expectedValue, ok := tt.expectedValue.(int)
+			if !ok {
+				t.Fatalf("Expected value type mismatch: expected=%T, got=%T", tt.expectedValue, v.Value)
+			}
+			if int(v.Value) != expectedValue {
+				t.Fatalf("IndexAssignment value not %v, got=%v", expectedValue, v.Value)
+			}
+		case *ast.StringLiteral:
+			expectedValue, ok := tt.expectedValue.(string)
+			if !ok {
+				t.Fatalf("Expected value type mismatch: expected=%T, got=%T", tt.expectedValue, v.Value)
+			}
+			if v.Value != expectedValue {
+				t.Fatalf("IndexAssignment value not %q, got=%q", expectedValue, v.Value)
+			}
+		default:
+			t.Fatalf("stmt.Value is not a valid literal type, got=%T", stmt.Value)
+		}
+	}
+}
+
 func TestGivesStatements(t *testing.T) {
 	tests := []struct {
 		input         string
@@ -60,9 +140,7 @@ func TestGivesStatements(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 
 		if len(program.Statements) != 1 {
@@ -108,9 +186,7 @@ func testYarStatement(t *testing.T, s ast.Statement, name string) bool {
 
 func TestIdentifierExpression(t *testing.T) {
 	input := "variableName."
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 	if len(program.Statements) != 1 {
 		t.Fatalf("program has not enough statements. got=%d",
@@ -136,9 +212,7 @@ func TestIdentifierExpression(t *testing.T) {
 
 func TestIntegerLiteralExpression(t *testing.T) {
 	input := "5."
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 	if len(program.Statements) != 1 {
 		t.Fatalf("program has not enough statements. got=%d",
@@ -174,9 +248,7 @@ func TestParsingPrefixExpressions(t *testing.T) {
 		{"!nay.", "!", false},
 	}
 	for _, tt := range prefixTests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 		if len(program.Statements) != 1 {
 			t.Fatalf("program.Statements does not contain %d statements. got=%d\n",
@@ -239,9 +311,7 @@ func TestParsingInfixExpressions(t *testing.T) {
 		{"nay = nay", false, "=", false},
 	}
 	for _, tt := range infixTests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 		if len(program.Statements) != 1 {
 			t.Fatalf("program.Statements does not contain %d statements. got=%d\n",
@@ -363,6 +433,14 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"(!(ay = ay))",
 		},
 		{
+			"ay and ay or nay",
+			"((ay and ay) or nay)",
+		},
+		{
+			"ay or nay and nay",
+			"(ay or (nay and nay))",
+		},
+		{
 			"a + add(b * c) + d",
 			"((a + add((b * c))) + d)",
 		},
@@ -374,11 +452,17 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"add(a + b + c * d / a + g)",
 			"add((((a + b) + ((c * d) / a)) + g))",
 		},
+		{
+			"a * [1, 2, 3, 4][b * c] * d",
+			"((a * ([1, 2, 3, 4][(b * c)])) * d)",
+		},
+		{
+			"foo(a * b[2], b[1], 2 * [1, 2][1])",
+			"foo((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+		},
 	}
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 		actual := program.String()
 		if actual != tt.expected {
@@ -480,9 +564,7 @@ func TestBooleanExpression(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 
 		if len(program.Statements) != 1 {
@@ -517,9 +599,7 @@ func TestFullConditionalStatement(t *testing.T) {
         10.
     .
     `
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 
 	if len(program.Statements) != 1 {
@@ -599,9 +679,7 @@ func TestIfStatement(t *testing.T) {
         x.
     .
     `
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 
 	if len(program.Statements) != 1 {
@@ -647,9 +725,7 @@ func TestIfStatement(t *testing.T) {
 
 func TestFunctionLiteralParsing(t *testing.T) {
 	input := `f(x, y): x + y..`
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 	if len(program.Statements) != 1 {
 		t.Fatalf("program.Body does not contain %d statements. got=%d\n",
@@ -693,9 +769,7 @@ func TestFunctionParameterParsing(t *testing.T) {
 		{input: "f(x, y, z): gives..", expectedParams: []string{"x", "y", "z"}},
 	}
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		p := New(l)
-		program := p.ParseProgram()
+		program, p := parseProgramFromInput(tt.input)
 		printErrors(t, p)
 		stmt := program.Statements[0].(*ast.ExpressionStatement)
 		function := stmt.Expression.(*ast.FunctionLiteral)
@@ -711,9 +785,7 @@ func TestFunctionParameterParsing(t *testing.T) {
 
 func TestCallExpressionParsing(t *testing.T) {
 	input := "add(1, 2 * 3, 4 + 5)."
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 	if len(program.Statements) != 1 {
 		t.Fatalf("program.Statements does not contain %d statements. got=%d\n",
@@ -742,9 +814,7 @@ func TestCallExpressionParsing(t *testing.T) {
 
 func TestStringLiteralExpression(t *testing.T) {
 	input := `"ay mate.".`
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
+	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 	stmt := program.Statements[0].(*ast.ExpressionStatement)
 	literal, ok := stmt.Expression.(*ast.StringLiteral)
@@ -753,5 +823,118 @@ func TestStringLiteralExpression(t *testing.T) {
 	}
 	if literal.Value != "ay mate." {
 		t.Errorf("literal.Value not %q. got=%q", "hello world", literal.Value)
+	}
+}
+
+func TestParsingArrayLiterals(t *testing.T) {
+	input := "[0, 3 + 3, 9*2]."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	array, ok := stmt.Expression.(*ast.ArrayLiteral)
+	if !ok {
+		t.Fatalf("exp not ast.ArrayLiteral. got=%T", stmt.Expression)
+	}
+	if len(array.Elements) != 3 {
+		t.Fatalf("len(array.Elements) not 3. got=%d", len(array.Elements))
+	}
+	testIntegerLiteral(t, array.Elements[0], 0)
+	testInfixExpression(t, array.Elements[1], 3, "+", 3)
+	testInfixExpression(t, array.Elements[2], 9, "*", 2)
+}
+
+func TestParsingIndexExpressions(t *testing.T) {
+	input := "arrrray[1 * 2]"
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	indexExp, ok := stmt.Expression.(*ast.IndexExpression)
+	if !ok {
+		t.Fatalf("exp not *ast.IndexExpression. got=%T", stmt.Expression)
+	}
+	if !testIdentifier(t, indexExp.Left, "arrrray") {
+		return
+	}
+	if !testInfixExpression(t, indexExp.Index, 1, "*", 2) {
+		return
+	}
+}
+
+func TestParsingHashLiteralsStringKeys(t *testing.T) {
+	input := `{"one": 1, "two": 2, "three": 3}`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	hash, ok := stmt.Expression.(*ast.HashMapLiteral)
+	if !ok {
+		t.Fatalf("exp is not ast.HashMapLiteral. got=%T", stmt.Expression)
+	}
+	if len(hash.MP) != 3 {
+		t.Errorf("hash.MP has wrong length. got=%d", len(hash.MP))
+	}
+	expected := map[string]int64{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	}
+	for key, value := range hash.MP {
+		literal, ok := key.(*ast.StringLiteral)
+		if !ok {
+			t.Errorf("key is not ast.StringLiteral. got=%T", key)
+		}
+		expectedValue := expected[literal.String()]
+		testIntegerLiteral(t, value, expectedValue)
+	}
+}
+
+func TestParsingEmptyHashMapLiteral(t *testing.T) {
+	input := "{}"
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	hash, ok := stmt.Expression.(*ast.HashMapLiteral)
+	if !ok {
+		t.Fatalf("exp is not ast.HashLiteral. got=%T", stmt.Expression)
+	}
+	if len(hash.MP) != 0 {
+		t.Errorf("hash.MP has wrong length. got=%d", len(hash.MP))
+	}
+}
+
+func TestParsingHashLiteralsWithExpressions(t *testing.T) {
+	input := `{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	hash, ok := stmt.Expression.(*ast.HashMapLiteral)
+	if !ok {
+		t.Fatalf("exp is not ast.HashMapLiteral. got=%T", stmt.Expression)
+	}
+	if len(hash.MP) != 3 {
+		t.Errorf("hash.MP has wrong length. got=%d", len(hash.MP))
+	}
+	tests := map[string]func(ast.Expression){
+		"one": func(e ast.Expression) {
+			testInfixExpression(t, e, 0, "+", 1)
+		},
+		"two": func(e ast.Expression) {
+			testInfixExpression(t, e, 10, "-", 8)
+		},
+		"three": func(e ast.Expression) {
+			testInfixExpression(t, e, 15, "/", 5)
+		},
+	}
+	for key, value := range hash.MP {
+		literal, ok := key.(*ast.StringLiteral)
+		if !ok {
+			t.Errorf("key is not ast.StringLiteral. got=%T", key)
+			continue
+		}
+		testFunc, ok := tests[literal.String()]
+		if !ok {
+			t.Errorf("No test function for key %q found", literal.String())
+			continue
+		}
+		testFunc(value)
 	}
 }

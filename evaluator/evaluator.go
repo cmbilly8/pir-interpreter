@@ -40,19 +40,156 @@ func Eval(node ast.Node, ns *object.Namespace) object.Object {
 	case *ast.FunctionLiteral:
 		return evalFuncLiteral(node, ns)
 	case *ast.CallExpression:
-		return evalFuncCall(node, ns)
+		return evalFuncCallNode(node, ns)
+	case *ast.IndexExpression:
+		return evalIndexExpressionNode(node, ns)
+	case *ast.IndexAssignment:
+		return evalIndexAssignmentNode(node, ns)
+	case *ast.ArrayLiteral:
+		return evalArrayLiteralNode(node, ns)
 	case *ast.StringLiteral:
 		return nativeStringToStringObj(node.Value)
+	case *ast.HashMapLiteral:
+		return evalHashMapLiteralNode(node, ns)
 	}
 	return MT
+}
 
+func evalIndexAssignmentNode(node *ast.IndexAssignment, ns *object.Namespace) object.Object {
+	left := Eval(node.Left, ns)
+	if object.IsError(left) {
+		return left
+	}
+	index := Eval(node.Index, ns)
+	if object.IsError(index) {
+		return index
+	}
+	value := Eval(node.Value, ns)
+	if object.IsError(value) {
+		return value
+	}
+
+	return evalIndexAssignment(left, index, value)
+
+}
+
+func evalIndexAssignment(left, index, val object.Object) object.Object {
+	switch {
+	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INT_OBJ:
+		return evalArrayIndexAssignment(left, index, val)
+	case left.Type() == object.HASHMAP_OBJ:
+		return evalHashMapIndexAssignment(left, index, val)
+	default:
+		return newError("index operator not supported: %s", left.Type())
+	}
+}
+
+func evalArrayIndexAssignment(left, index, val object.Object) object.Object {
+	arr := left.(*object.Array)
+	i := index.(*object.Int).Value
+	mx := int64(len(arr.Elements) - 1)
+	if i < 0 || i > mx {
+		return newError("index out of bounds. len=%d, index=%d", len(arr.Elements), i)
+	}
+	arr.Elements[i] = val
+	return MT
+}
+
+func evalHashMapIndexAssignment(left, key, val object.Object) object.Object {
+	if hashMap, ok := left.(*object.HashMap); ok {
+		preHashKey, ok := key.(object.Hashable)
+		if !ok {
+			return newError("Object not hashable: type=%T", key)
+		}
+		hashKey := preHashKey.Hash()
+		hashMap.MP[hashKey] = object.KVP{Key: key, Value: val}
+	}
+	return MT
+}
+
+func evalHashMapLiteralNode(node *ast.HashMapLiteral, ns *object.Namespace) object.Object {
+	hm := make(map[object.HashKey]object.KVP)
+	for keyNode, valueNode := range node.MP {
+		key := Eval(keyNode, ns)
+		if object.IsError(key) {
+			return key
+		}
+		preHashKey, ok := key.(object.Hashable)
+		if !ok {
+			return newError("Object not hashable. Type=%s", key.Type())
+		}
+
+		value := Eval(valueNode, ns)
+
+		if object.IsError(value) {
+			return value
+		}
+		hashKey := preHashKey.Hash()
+		hm[hashKey] = object.KVP{Key: key, Value: value}
+	}
+	return &object.HashMap{MP: hm}
+}
+
+func evalIndexExpressionNode(node *ast.IndexExpression, ns *object.Namespace) object.Object {
+	left := Eval(node.Left, ns)
+	if object.IsError(left) {
+		return left
+	}
+	index := Eval(node.Index, ns)
+	if object.IsError(index) {
+		return index
+	}
+	return evalIndexExpression(left, index)
+}
+
+func evalIndexExpression(left, index object.Object) object.Object {
+	switch {
+	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INT_OBJ:
+		return evalArrayIndexExpression(left, index)
+	case left.Type() == object.HASHMAP_OBJ:
+		return evalHashMapIndexExpression(left, index)
+	default:
+		return newError("index operator not supported: %s", left.Type())
+	}
+}
+
+func evalHashMapIndexExpression(hash, index object.Object) object.Object {
+	hashObject := hash.(*object.HashMap)
+	key, ok := index.(object.Hashable)
+	if !ok {
+		return newError("Object not hashable. Type=%s", index.Type())
+	}
+	kvp, ok := hashObject.MP[key.Hash()]
+	if !ok {
+		return MT
+	}
+	return kvp.Value
+
+}
+
+func evalArrayIndexExpression(array, index object.Object) object.Object {
+	arr := array.(*object.Array)
+	i := index.(*object.Int).Value
+	mx := int64(len(arr.Elements) - 1)
+	if i < 0 || i > mx {
+		return newError("index out of bounds. len=%d, index=%d", len(arr.Elements), i)
+	}
+	return arr.Elements[i]
+}
+
+func evalArrayLiteralNode(node *ast.ArrayLiteral, ns *object.Namespace) object.Object {
+	elements := evalExpressions(node.Elements, ns)
+	if len(elements) == 1 && object.IsError(elements[0]) {
+		return elements[0]
+	}
+	return &object.Array{Elements: elements}
 }
 
 func nativeStringToStringObj(str string) object.Object {
 	return &object.String{Value: str}
 }
 
-func evalFuncCall(node *ast.CallExpression, ns *object.Namespace) object.Object {
+func evalFuncCallNode(node *ast.CallExpression, ns *object.Namespace) object.Object {
 	f := Eval(node.Function, ns)
 	if object.IsError(f) {
 		return f
@@ -65,13 +202,16 @@ func evalFuncCall(node *ast.CallExpression, ns *object.Namespace) object.Object 
 }
 
 func callFunc(f object.Object, args []object.Object) object.Object {
-	function, ok := f.(*object.Function)
-	if !ok {
+	switch f := f.(type) {
+	case *object.Function:
+		localNS := newLocalNamespace(f, args)
+		result := Eval(f.Body, localNS)
+		return extractGivesValue(result)
+	case *object.Builtin:
+		return f.Fn(args...)
+	default:
 		return newError("Not a function: %s", f.Type())
 	}
-	localNS := newLocalNamespace(function, args)
-	result := Eval(function.Body, localNS)
-	return extractGivesValue(result)
 }
 
 func newLocalNamespace(f *object.Function, args []object.Object) *object.Namespace {
@@ -93,8 +233,8 @@ func extractGivesValue(obj object.Object) object.Object {
 func evalExpressions(exps []ast.Expression, ns *object.Namespace) []object.Object {
 	var objs []object.Object
 	// Can't wait until I forget about this
-	for i := len(exps) - 1; i >= 0; i-- {
-		evaluated := Eval(exps[i], ns)
+	for _, exp := range exps {
+		evaluated := Eval(exp, ns)
 		if object.IsError(evaluated) {
 			return []object.Object{evaluated}
 		}
@@ -110,11 +250,14 @@ func evalFuncLiteral(node *ast.FunctionLiteral, ns *object.Namespace) object.Obj
 }
 
 func evalIdentifier(node *ast.Identifier, ns *object.Namespace) object.Object {
-	val, ok := ns.Get(node.Value)
-	if !ok {
-		return newError("Identifier not found: %s", node.Value)
+	if val, ok := ns.Get(node.Value); ok {
+		return val
 	}
-	return val
+	if builtin := resolveBuiltin(node.Value); builtin != nil {
+		return builtin
+	}
+
+	return newError("Identifier not found: %s", node.Value)
 }
 
 func evalYarStatementNode(node *ast.YarStatement, ns *object.Namespace) object.Object {
@@ -210,6 +353,10 @@ func evalBoolInfixExpression(left object.Object, operator string, right object.O
 		return nativeBoolToBoolObj(left == right)
 	case "!=":
 		return nativeBoolToBoolObj(left != right)
+	case "and":
+		return nativeBoolToBoolObj(left == AY && right == AY)
+	case "or":
+		return nativeBoolToBoolObj(left == AY || right == AY)
 	default:
 		return newError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())

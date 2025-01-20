@@ -74,6 +74,10 @@ func (l *Lexer) NextToken() token.Token {
 		currentToken = l.newToken(token.LBRACE, "{")
 	case '}':
 		currentToken = l.newToken(token.RBRACE, "}")
+	case '[':
+		currentToken = l.newToken(token.LBRACKET, "[")
+	case ']':
+		currentToken = l.newToken(token.RBRACKET, "]")
 	case '\'', '"':
 		str := l.readString()
 		currentToken = l.newToken(token.STRING, str)
@@ -111,6 +115,7 @@ func (l *Lexer) ignoreComment() {
 		for l.ch != '\n' {
 			l.readChar()
 		}
+		l.ignoreWhitespace()
 	}
 }
 

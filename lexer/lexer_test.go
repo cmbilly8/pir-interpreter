@@ -11,6 +11,7 @@ func TestNextToken(t *testing.T) {
 	yar add be f(x, y):
 		gives x + y..
 	yar result be add(five, ten).
+    $ comment
 	!-/*5.
 	5 < 10 > 5.
 	if 5 < 10:
@@ -19,6 +20,8 @@ func TestNextToken(t *testing.T) {
 		gives nay.
     "yes".
     'yes no'.
+    [8, 3].
+    {"ay": "matey"}.
 	`
 
 	tests := []struct {
@@ -89,6 +92,18 @@ func TestNextToken(t *testing.T) {
 		{token.STRING, "yes"},
 		{token.PERIOD, "."},
 		{token.STRING, "yes no"},
+		{token.PERIOD, "."},
+		{token.LBRACKET, "["},
+		{token.INT, "8"},
+		{token.COMMA, ","},
+		{token.INT, "3"},
+		{token.RBRACKET, "]"},
+		{token.PERIOD, "."},
+		{token.LBRACE, "{"},
+		{token.STRING, "ay"},
+		{token.COLOGNE, ":"},
+		{token.STRING, "matey"},
+		{token.RBRACE, "}"},
 		{token.PERIOD, "."},
 		{token.EOF, ""},
 	}

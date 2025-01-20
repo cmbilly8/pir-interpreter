@@ -37,7 +37,7 @@ func Start(in io.Reader, out io.Writer) {
 
 		evaluated := evaluator.Eval(program, ns)
 		if evaluated != nil && evaluated != evaluator.MT {
-			io.WriteString(out, evaluated.Inspect())
+			io.WriteString(out, evaluated.AsString())
 			io.WriteString(out, "\n")
 		}
 	}

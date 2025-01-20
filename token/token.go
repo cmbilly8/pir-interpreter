@@ -27,6 +27,8 @@ const (
 	RPAREN    = ")"
 	LBRACE    = "{"
 	RBRACE    = "}"
+	LBRACKET  = "["
+	RBRACKET  = "]"
 	// Keywords
 	F       = "F"
 	YAR     = "YAR"
@@ -37,6 +39,7 @@ const (
 	CHANTEY = "CHANTEY"
 	AVAST   = "AVAST"
 	OR      = "OR"
+	AND     = "AND"
 	TRUE    = "TRUE"
 	FALSE   = "FALSE"
 	STRING  = "STRING"
@@ -67,31 +70,49 @@ func (tok *Token) IsBlockTerminator() bool {
 	}
 }
 
+func (tok *Token) IsExpressionTerminator() bool {
+	switch tok.Type {
+	case PERIOD, COLOGNE, BE:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	_ int = iota
-	LOWEST
-	EQUALS      // =
-	LESSGREATER // > or <
-	SUM         // +
-	PRODUCT     // *
-	PREFIX      // -X or !X
-	CALL        // myFunction(X)
+	PREC_LOWEST
+	PREC_LOGIC_OR
+	PREC_LOGIC_AND
+	PREC_EQUALS      // =
+	PREC_LESSGREATER // > or <
+	PREC_SUM         // +
+	PREC_PRODUCT     // *
+	PREC_PREFIX      // -X or !X
+	PREC_CALL        // myFunction(X)
+	PREC_INDEX       // array[i]
 )
 
 func (tok *Token) Precedence() int {
 	switch tok.Type {
 	case EQUAL, NOTEQUAL:
-		return EQUALS
+		return PREC_EQUALS
+	case OR:
+		return PREC_LOGIC_OR
+	case AND:
+		return PREC_LOGIC_AND
 	case LESS, GREATER:
-		return LESSGREATER
+		return PREC_LESSGREATER
 	case PLUS, MINUS:
-		return SUM
+		return PREC_SUM
 	case FSLASH, STAR:
-		return PRODUCT
+		return PREC_PRODUCT
 	case LPAREN:
-		return CALL
+		return PREC_CALL
+	case LBRACKET:
+		return PREC_INDEX
 	default:
-		return LOWEST
+		return PREC_LOWEST
 	}
 }
 
@@ -117,6 +138,8 @@ func LookupIdent(ident string) TokenType {
 		return AVAST
 	case "or":
 		return OR
+	case "and":
+		return AND
 	case "ay":
 		return TRUE
 	case "nay":

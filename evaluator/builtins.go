@@ -20,10 +20,12 @@ func resolveBuiltin(id string) *object.Builtin {
 		builtin.Fn = push
 	case "insert":
 		builtin.Fn = insert
-	case "isMT":
+	case "isMTValue":
 		builtin.Fn = isMT
 	case "ahoy":
 		builtin.Fn = ahoy
+	case "empty":
+		builtin.Fn = empty
 	default:
 		return nil
 	}
@@ -61,6 +63,25 @@ func len_f(args ...object.Object) object.Object {
 		return nativeIntToIntObj(int64(len(arg.Elements)))
 	default:
 		return newError("argument to `len` not supported, got %s",
+			args[0].Type())
+	}
+}
+
+func empty(args ...object.Object) object.Object {
+	if len(args) != 1 {
+		return newError("wrong number of args. got=%d, expected=1",
+			len(args))
+	}
+
+	switch arg := args[0].(type) {
+	case *object.HashMap:
+		arg.MP = make(map[object.HashKey]object.KVP)
+		return arg
+	case *object.Array:
+		arg.Elements = make([]object.Object, 0)
+		return arg
+	default:
+		return newError("argument to `empty` not supported, got %s",
 			args[0].Type())
 	}
 }

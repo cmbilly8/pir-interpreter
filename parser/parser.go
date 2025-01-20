@@ -136,17 +136,28 @@ func (p *Parser) ParseProgram() *ast.Program {
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.YAR:
-		return p.parseYarStatement()
+		yarTok := p.curToken
+		if !p.expectPeekToken(token.IDENT) {
+			return nil
+		}
+		return p.parseYarStatement(yarTok)
 	case token.GIVES:
 		return p.parseGivesStatement()
 	case token.IF:
 		return p.parseIfStatement()
-	// If we start with an expression
+	case token.FOR:
+		return p.parseForStatement()
+	case token.BREAK:
+		return p.parseBreakStatement()
 	default:
 		startToken := p.curToken
 		expr := p.parseExpression(token.PREC_LOWEST)
 		if indexAssign, ok := expr.(*ast.IndexExpression); ok && p.peekToken.Is(token.BE) {
 			return p.parseIndexAssignment(startToken, indexAssign)
+		}
+
+		if _, ok := expr.(*ast.Identifier); ok && p.peekToken.Is(token.BE) {
+			return p.parseYarStatement(token.Token{Type: token.YAR, Literal: "FAKEYAR"})
 		}
 
 		if p.peekToken.Is(token.PERIOD) {
@@ -173,6 +184,14 @@ func (p *Parser) parseIndexAssignment(startToken token.Token, indexAssign *ast.I
 
 func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseBreakStatement() *ast.BreakStatement {
+	stmt := &ast.BreakStatement{Token: p.curToken}
+	if p.peekToken.Is(token.PERIOD) {
+		p.advanceTokens()
+	}
+	return stmt
 }
 
 func (p *Parser) parseStringLiteral() ast.Expression {
@@ -314,6 +333,22 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 
 }
 
+func (p *Parser) parseForStatement() *ast.ForStatement {
+	stmt := &ast.ForStatement{Token: p.curToken}
+	p.advanceTokens()
+	stmt.Condition = p.parseExpression(token.PREC_LOWEST)
+
+	if !p.expectPeekToken(token.COLOGNE) {
+		return nil
+	}
+
+	p.advanceTokens()
+
+	stmt.Body = p.parseBlockStatement()
+
+	return stmt
+}
+
 func (p *Parser) parseIfStatement() *ast.IfStatement {
 	statement := &ast.IfStatement{Token: p.curToken}
 
@@ -346,12 +381,8 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 	return statement
 }
 
-func (p *Parser) parseYarStatement() *ast.YarStatement {
-	statement := &ast.YarStatement{Token: p.curToken}
-
-	if !p.expectPeekToken(token.IDENT) {
-		return nil
-	}
+func (p *Parser) parseYarStatement(start token.Token) *ast.YarStatement {
+	statement := &ast.YarStatement{Token: start}
 
 	statement.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 

@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"pir-interpreter/evaluator"
+	"pir-interpreter/lexer"
+	"pir-interpreter/object"
+	"pir-interpreter/parser"
 	"pir-interpreter/repl"
-	"pir-interpreter/visualizer"
 )
 
 func main() {
-	visualize := flag.Bool("ast", false, "Generate and open the AST visualization PNG")
 	startREPL := flag.Bool("r", false, "Start pir repl")
 	flag.Parse()
 
@@ -29,7 +31,10 @@ func main() {
 		fmt.Println("Error: Problem reading file")
 	}
 
-	if *visualize {
-		visualizer.Visualize(string(code))
-	}
+	ns := object.NewNamespace()
+	l := lexer.New(string(code))
+	p := parser.New(l)
+	program := p.ParseProgram()
+	evaluated := evaluator.Eval(program, ns)
+	print(evaluated.AsString())
 }

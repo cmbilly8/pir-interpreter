@@ -20,6 +20,7 @@ const (
 	BUILTIN_OBJ     = "BUILTIN"
 	ARRAY_OBJ       = "ARRAY"
 	HASHMAP_OBJ     = "HASHMAP"
+	BREAK_OBJ       = "BREAK"
 )
 
 type ObjectType string
@@ -64,6 +65,12 @@ type GivesValue struct {
 
 func (gv *GivesValue) Type() ObjectType { return GIVES_VALUE_OBJ }
 func (gv *GivesValue) AsString() string { return gv.Value.AsString() }
+
+type Break struct {
+}
+
+func (b *Break) Type() ObjectType { return BREAK_OBJ }
+func (b *Break) AsString() string { return "break" }
 
 type Error struct {
 	Message string

@@ -197,6 +197,14 @@ func (b *Boolean) expressionNode()      {}
 func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
 func (b *Boolean) String() string       { return b.Token.Literal }
 
+type BreakStatement struct {
+	Token token.Token
+}
+
+func (b *BreakStatement) statementNode()       {}
+func (b *BreakStatement) TokenLiteral() string { return b.Token.Literal }
+func (b *BreakStatement) String() string       { return b.Token.Literal }
+
 type BlockStatement struct {
 	Token      token.Token // should be : since it starts a block
 	Statements []Statement
@@ -206,9 +214,12 @@ func (bs *BlockStatement) statementNode()       {}
 func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
 func (bs *BlockStatement) String() string {
 	var out bytes.Buffer
+	out.WriteString("(")
 	for _, s := range bs.Statements {
 		out.WriteString(s.String())
+		out.WriteString(".")
 	}
+	out.WriteString(")")
 	return out.String()
 }
 
@@ -338,5 +349,22 @@ func (hml *HashMapLiteral) String() string {
 	out.WriteString("{")
 	out.WriteString(strings.Join(pairs, ", "))
 	out.WriteString("}")
+	return out.String()
+}
+
+type ForStatement struct {
+	Token     token.Token
+	Condition Expression
+	Body      *BlockStatement
+}
+
+func (fs *ForStatement) statementNode()       {}
+func (fs *ForStatement) TokenLiteral() string { return fs.Token.Literal }
+func (fs *ForStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("for ")
+	out.WriteString(fs.Condition.String())
+	out.WriteString(": ")
+	out.Write([]byte(fs.Body.String()))
 	return out.String()
 }

@@ -30,19 +30,19 @@ const (
 	LBRACKET  = "["
 	RBRACKET  = "]"
 	// Keywords
-	F       = "F"
-	YAR     = "YAR"
-	GIVES   = "GIVES"
-	IF      = "IF"
-	LSIF    = "LSIF"
-	LS      = "LS"
-	CHANTEY = "CHANTEY"
-	AVAST   = "AVAST"
-	OR      = "OR"
-	AND     = "AND"
-	TRUE    = "TRUE"
-	FALSE   = "FALSE"
-	STRING  = "STRING"
+	F      = "F"
+	YAR    = "YAR"
+	GIVES  = "GIVES"
+	IF     = "IF"
+	LSIF   = "LSIF"
+	LS     = "LS"
+	OR     = "OR"
+	AND    = "AND"
+	TRUE   = "TRUE"
+	FALSE  = "FALSE"
+	STRING = "STRING"
+	FOR    = "FOR"
+	BREAK  = "BREAK"
 )
 
 type TokenType string
@@ -132,10 +132,6 @@ func LookupIdent(ident string) TokenType {
 		return LSIF
 	case "ls":
 		return LS
-	case "chantey":
-		return CHANTEY
-	case "avast":
-		return AVAST
 	case "or":
 		return OR
 	case "and":
@@ -144,6 +140,10 @@ func LookupIdent(ident string) TokenType {
 		return TRUE
 	case "nay":
 		return FALSE
+	case "for":
+		return FOR
+	case "break":
+		return BREAK
 	default:
 		return IDENT
 	}

@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"pir-interpreter/ast"
 	"pir-interpreter/object"
+	"strconv"
 )
 
 var (
 	AY    = &object.Bool{Value: true}
 	NAY   = &object.Bool{Value: false}
 	MT    = &object.MT{}
-	MAYBE = &object.Maybe{}
+	BREAK = &object.Break{}
 )
 
 func Eval(node ast.Node, ns *object.Namespace) object.Object {
@@ -37,6 +38,8 @@ func Eval(node ast.Node, ns *object.Namespace) object.Object {
 		return evalGivesStatementNode(node, ns)
 	case *ast.YarStatement:
 		return evalYarStatementNode(node, ns)
+	case *ast.ForStatement:
+		return evalForStatementNode(node, ns)
 	case *ast.FunctionLiteral:
 		return evalFuncLiteral(node, ns)
 	case *ast.CallExpression:
@@ -51,6 +54,8 @@ func Eval(node ast.Node, ns *object.Namespace) object.Object {
 		return nativeStringToStringObj(node.Value)
 	case *ast.HashMapLiteral:
 		return evalHashMapLiteralNode(node, ns)
+	case *ast.BreakStatement:
+		return BREAK
 	}
 	return MT
 }
@@ -288,6 +293,36 @@ func evalGivesStatementNode(node *ast.GivesStatement, ns *object.Namespace) obje
 	return &object.GivesValue{Value: value}
 }
 
+func evalForStatementNode(node *ast.ForStatement, ns *object.Namespace) object.Object {
+	condition := Eval(node.Condition, ns)
+	if object.IsError(condition) {
+		return condition
+	}
+
+	if condition.Type() != object.BOOL_OBJ {
+		return newError("For statement condition is not boolen. Got type=%s", condition.Type())
+	}
+
+	for condition == AY {
+		if node.Body != nil {
+			result := Eval(node.Body, ns)
+			if object.IsError(result) || result.Type() == object.GIVES_VALUE_OBJ {
+				return result
+			}
+
+			if result == BREAK {
+				return MT
+			}
+		}
+
+		condition = Eval(node.Condition, ns)
+		if object.IsError(condition) {
+			return condition
+		}
+	}
+	return MT
+}
+
 func evalIfStatementNode(node *ast.IfStatement, ns *object.Namespace) object.Object {
 	for _, conditional := range node.Conditionals {
 		if cond := Eval(conditional.Condition, ns); cond == AY {
@@ -336,6 +371,10 @@ func evalInfixExpressionNode(node *ast.InfixExpression, ns *object.Namespace) ob
 		return evalBoolInfixExpression(left, node.Operator, right)
 	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
 		return evalStringInfixExpression(left, node.Operator, right)
+	case left.Type() == object.STRING_OBJ && right.Type() == object.INT_OBJ:
+		return evalStringInfixExpression(left, node.Operator, castIntToString(right))
+	case left.Type() == object.INT_OBJ && right.Type() == object.STRING_OBJ:
+		return evalStringInfixExpression(castIntToString(left), node.Operator, right)
 	case left.Type() != right.Type():
 		return newError("type mismatch: %s %s %s",
 			left.Type(), node.Operator, right.Type())
@@ -343,6 +382,15 @@ func evalInfixExpressionNode(node *ast.InfixExpression, ns *object.Namespace) ob
 		return newError("No infix expression for: %s %s %s",
 			left.Type(), node.Operator, right.Type())
 	}
+
+}
+
+func castIntToString(obj object.Object) object.Object {
+	intObj, ok := obj.(*object.Int)
+	if ok {
+		return &object.String{Value: strconv.FormatInt(intObj.Value, 10)}
+	}
+	return newError("Error while casting INT to STRING. Expected INT, got %s", obj.Type())
 
 }
 

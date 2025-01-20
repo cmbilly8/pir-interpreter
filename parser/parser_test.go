@@ -938,3 +938,38 @@ func TestParsingHashLiteralsWithExpressions(t *testing.T) {
 		testFunc(value)
 	}
 }
+
+func TestForStatementParsing(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "for x < 10: x..",
+			expected: "for (x < 10): (x.)",
+		},
+		{
+			input:    "for ay: x+y. y..",
+			expected: "for ay: ((x + y).y.)",
+		},
+	}
+
+	for _, tt := range tests {
+		program, p := parseProgramFromInput(tt.input)
+		printErrors(t, p)
+
+		if len(program.Statements) != 1 {
+			t.Fatalf("program.Statements does not contain 1 statement. got=%d", len(program.Statements))
+		}
+
+		stmt, ok := program.Statements[0].(*ast.ForStatement)
+		if !ok {
+			t.Fatalf("program.Statements[0] is not ast.ForStatement. got=%T", program.Statements[0])
+		}
+
+		actual := stmt.String()
+		if actual != tt.expected {
+			t.Errorf("ForStatement.String() mismatch. Expected=%q, Got=%q", tt.expected, actual)
+		}
+	}
+}

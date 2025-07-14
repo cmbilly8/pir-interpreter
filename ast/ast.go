@@ -74,6 +74,23 @@ func (ys *YarStatement) String() string {
 	return out.String()
 }
 
+type PortStatement struct {
+	Token token.Token
+	Name  *Identifier
+}
+
+func (ps *PortStatement) statementNode()       {}
+func (ps *PortStatement) TokenLiteral() string { return ps.Token.Literal }
+func (ps *PortStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(ps.TokenLiteral() + " ")
+	if ps.Name != nil {
+		out.WriteString(ps.Name.String())
+	}
+	out.WriteString(".")
+	return out.String()
+}
+
 type GivesStatement struct {
 	Token token.Token
 	Value Expression
@@ -118,8 +135,8 @@ func (is *IfStatement) String() string {
 	for _, c := range is.Conditionals {
 		out.WriteString(c.String())
 	}
-	out.WriteString("ls: ")
 	if is.Alternate != nil {
+		out.WriteString("ls: ")
 		out.WriteString(is.Alternate.String())
 	}
 	return out.String()
@@ -362,7 +379,7 @@ func (fs *ForStatement) statementNode()       {}
 func (fs *ForStatement) TokenLiteral() string { return fs.Token.Literal }
 func (fs *ForStatement) String() string {
 	var out bytes.Buffer
-	out.WriteString("for ")
+	out.WriteString("4 ")
 	out.WriteString(fs.Condition.String())
 	out.WriteString(": ")
 	out.Write([]byte(fs.Body.String()))

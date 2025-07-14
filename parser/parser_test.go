@@ -129,6 +129,38 @@ func TestIndexAssignStatements(t *testing.T) {
 	}
 }
 
+func TestPortStatement(t *testing.T) {
+	tests := []struct {
+		input         string
+		expectedValue string
+	}{
+		{"port a.", "a"},
+	}
+
+	for _, tt := range tests {
+		program, p := parseProgramFromInput(tt.input)
+		printErrors(t, p)
+
+		if len(program.Statements) != 1 {
+			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
+				len(program.Statements))
+		}
+
+		stmt := program.Statements[0]
+		portStatement, ok := stmt.(*ast.PortStatement)
+		if !ok {
+			t.Fatalf("stmt not *ast.PortStatement. got=%T", stmt)
+		}
+		if portStatement.TokenLiteral() != "port" {
+			t.Fatalf("portStatement.TokenLiteral not 'port', got %q",
+				portStatement.TokenLiteral())
+		}
+		if !testIdentifier(t, portStatement.Name, tt.expectedValue) {
+			return
+		}
+	}
+}
+
 func TestGivesStatements(t *testing.T) {
 	tests := []struct {
 		input         string
@@ -304,10 +336,13 @@ func TestParsingInfixExpressions(t *testing.T) {
 		{"5 / 5.", 5, "/", 5},
 		{"5 > 5.", 5, ">", 5},
 		{"5 < 5.", 5, "<", 5},
+		{"5 <= 5.", 5, "<=", 5},
+		{"5 >= 5.", 5, ">=", 5},
 		{"5 = 5.", 5, "=", 5},
-		{"5 != 5.", 5, "!=", 5},
+		{"5 <> 5.", 5, "<>", 5},
+		{"5 mod 5.", 5, "mod", 5},
 		{"ay = ay", true, "=", true},
-		{"ay != nay", true, "!=", false},
+		{"ay <> nay", true, "<>", false},
 		{"nay = nay", false, "=", false},
 	}
 	for _, tt := range infixTests {
@@ -365,6 +400,10 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"((a * b) * c)",
 		},
 		{
+			"a mod b / c",
+			"((a mod b) / c)",
+		},
+		{
 			"a * b / c",
 			"((a * b) / c)",
 		},
@@ -373,28 +412,36 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"(a + (b / c))",
 		},
 		{
+			"a + b mod c",
+			"(a + (b mod c))",
+		},
+		{
 			"a + b * c + d / e - g",
 			"(((a + (b * c)) + (d / e)) - g)",
 		},
 		{
-			"3 + 4. -5 * 5",
-			"(3 + 4)((-5) * 5)",
+			"3 + 3. -5 * 5",
+			"(3 + 3)((-5) * 5)",
 		},
 		{
-			"5 > 4 = 3 < 4",
-			"((5 > 4) = (3 < 4))",
+			"5 > 3 = 3 < 5",
+			"((5 > 3) = (3 < 5))",
 		},
 		{
-			"5 < 4 != 3 > 4",
-			"((5 < 4) != (3 > 4))",
+			"5 <= 1 <> 3 > 5",
+			"((5 <= 1) <> (3 > 5))",
 		},
 		{
-			"3 + 4 * 5 = 3 * 1 + 4 * 5",
-			"((3 + (4 * 5)) = ((3 * 1) + (4 * 5)))",
+			"3 + 1 * 5 = 3 * 1 + 5 * 5",
+			"((3 + (1 * 5)) = ((3 * 1) + (5 * 5)))",
 		},
 		{
-			"3 + 4 * 5 = 3 * 1 + 4 * 5",
-			"((3 + (4 * 5)) = ((3 * 1) + (4 * 5)))",
+			"3 + 6 * 5 = 3 * 1 + 1 * 5",
+			"((3 + (6 * 5)) = ((3 * 1) + (1 * 5)))",
+		},
+		{
+			"3 + 2 mod 5 = 3 * 1 + 2 mod 5",
+			"((3 + (2 mod 5)) = ((3 * 1) + (2 mod 5)))",
 		},
 		{
 			"true",
@@ -413,8 +460,12 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"((3 < 5) = true)",
 		},
 		{
-			"1 + (2 + 3) + 4",
-			"((1 + (2 + 3)) + 4)",
+			"3 <= 5 = true",
+			"((3 <= 5) = true)",
+		},
+		{
+			"1 + (2 + 3) + 5",
+			"((1 + (2 + 3)) + 5)",
 		},
 		{
 			"(5 + 5) * 2",
@@ -445,16 +496,16 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"((a + add((b * c))) + d)",
 		},
 		{
-			"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
-			"add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+			"add(a, b, 1, 2 * 3, 2 + 5, add(6, 7 * 8))",
+			"add(a, b, 1, (2 * 3), (2 + 5), add(6, (7 * 8)))",
 		},
 		{
 			"add(a + b + c * d / a + g)",
 			"add((((a + b) + ((c * d) / a)) + g))",
 		},
 		{
-			"a * [1, 2, 3, 4][b * c] * d",
-			"((a * ([1, 2, 3, 4][(b * c)])) * d)",
+			"a * [1, 2, 3, 3][b * c] * d",
+			"((a * ([1, 2, 3, 3][(b * c)])) * d)",
 		},
 		{
 			"foo(a * b[2], b[1], 2 * [1, 2][1])",
@@ -784,7 +835,7 @@ func TestFunctionParameterParsing(t *testing.T) {
 }
 
 func TestCallExpressionParsing(t *testing.T) {
-	input := "add(1, 2 * 3, 4 + 5)."
+	input := "add(1, 2 * 3, 2 + 5)."
 	program, p := parseProgramFromInput(input)
 	printErrors(t, p)
 	if len(program.Statements) != 1 {
@@ -809,7 +860,7 @@ func TestCallExpressionParsing(t *testing.T) {
 	}
 	testLiteralExpression(t, exp.Arguments[0], 1)
 	testInfixExpression(t, exp.Arguments[1], 2, "*", 3)
-	testInfixExpression(t, exp.Arguments[2], 4, "+", 5)
+	testInfixExpression(t, exp.Arguments[2], 2, "+", 5)
 }
 
 func TestStringLiteralExpression(t *testing.T) {
@@ -945,12 +996,12 @@ func TestForStatementParsing(t *testing.T) {
 		expected string
 	}{
 		{
-			input:    "for x < 10: x..",
-			expected: "for (x < 10): (x.)",
+			input:    "4 x < 10: x..",
+			expected: "4 (x < 10): (x.)",
 		},
 		{
-			input:    "for ay: x+y. y..",
-			expected: "for ay: ((x + y).y.)",
+			input:    "4 ay: x+y. y..",
+			expected: "4 ay: ((x + y).y.)",
 		},
 	}
 

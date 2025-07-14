@@ -36,6 +36,8 @@ func Eval(node ast.Node, ns *object.Namespace) object.Object {
 		return evalInfixExpressionNode(node, ns)
 	case *ast.GivesStatement:
 		return evalGivesStatementNode(node, ns)
+	case *ast.PortStatement:
+		return evalPortStatementNode()
 	case *ast.YarStatement:
 		return evalYarStatementNode(node, ns)
 	case *ast.ForStatement:
@@ -85,7 +87,7 @@ func evalIndexAssignment(left, index, val object.Object) object.Object {
 	case left.Type() == object.HASHMAP_OBJ:
 		return evalHashMapIndexAssignment(left, index, val)
 	default:
-		return newError("index operator not supported: %s", left.Type())
+		return newEvaluationError("index operator not supported: %s", left.Type())
 	}
 }
 
@@ -94,7 +96,7 @@ func evalArrayIndexAssignment(left, index, val object.Object) object.Object {
 	i := index.(*object.Int).Value
 	mx := int64(len(arr.Elements) - 1)
 	if i < 0 || i > mx {
-		return newError("index out of bounds. len=%d, index=%d", len(arr.Elements), i)
+		return newEvaluationError("index out of bounds. len=%d, index=%d", len(arr.Elements), i)
 	}
 	arr.Elements[i] = val
 	return MT
@@ -104,7 +106,7 @@ func evalHashMapIndexAssignment(left, key, val object.Object) object.Object {
 	if hashMap, ok := left.(*object.HashMap); ok {
 		preHashKey, ok := key.(object.Hashable)
 		if !ok {
-			return newError("Object not hashable: type=%T", key)
+			return newEvaluationError("Object not hashable: type=%T", key)
 		}
 		hashKey := preHashKey.Hash()
 		hashMap.MP[hashKey] = object.KVP{Key: key, Value: val}
@@ -121,7 +123,7 @@ func evalHashMapLiteralNode(node *ast.HashMapLiteral, ns *object.Namespace) obje
 		}
 		preHashKey, ok := key.(object.Hashable)
 		if !ok {
-			return newError("Object not hashable. Type=%s", key.Type())
+			return newEvaluationError("Object not hashable. Type=%s", key.Type())
 		}
 
 		value := Eval(valueNode, ns)
@@ -154,7 +156,7 @@ func evalIndexExpression(left, index object.Object) object.Object {
 	case left.Type() == object.HASHMAP_OBJ:
 		return evalHashMapIndexExpression(left, index)
 	default:
-		return newError("index operator not supported: %s", left.Type())
+		return newEvaluationError("index operator not supported: %s", left.Type())
 	}
 }
 
@@ -162,7 +164,7 @@ func evalHashMapIndexExpression(hash, index object.Object) object.Object {
 	hashObject := hash.(*object.HashMap)
 	key, ok := index.(object.Hashable)
 	if !ok {
-		return newError("Object not hashable. Type=%s", index.Type())
+		return newEvaluationError("Object not hashable. Type=%s", index.Type())
 	}
 	kvp, ok := hashObject.MP[key.Hash()]
 	if !ok {
@@ -177,7 +179,7 @@ func evalArrayIndexExpression(array, index object.Object) object.Object {
 	i := index.(*object.Int).Value
 	mx := int64(len(arr.Elements) - 1)
 	if i < 0 || i > mx {
-		return newError("index out of bounds. len=%d, index=%d", len(arr.Elements), i)
+		return newEvaluationError("index out of bounds. len=%d, index=%d", len(arr.Elements), i)
 	}
 	return arr.Elements[i]
 }
@@ -209,17 +211,17 @@ func evalFuncCallNode(node *ast.CallExpression, ns *object.Namespace) object.Obj
 func callFunc(f object.Object, args []object.Object) object.Object {
 	switch f := f.(type) {
 	case *object.Function:
-		localNS := newLocalNamespace(f, args)
+		localNS := newFunctionNamespace(f, args)
 		result := Eval(f.Body, localNS)
 		return extractGivesValue(result)
 	case *object.Builtin:
 		return f.Fn(args...)
 	default:
-		return newError("Not a function: %s", f.Type())
+		return newEvaluationError("Not a function: %s", f.Type())
 	}
 }
 
-func newLocalNamespace(f *object.Function, args []object.Object) *object.Namespace {
+func newFunctionNamespace(f *object.Function, args []object.Object) *object.Namespace {
 	localNS := object.NewNestedNamespace(f.NS)
 	for i, param := range f.Params {
 		localNS.Set(param.Value, args[i])
@@ -237,7 +239,6 @@ func extractGivesValue(obj object.Object) object.Object {
 
 func evalExpressions(exps []ast.Expression, ns *object.Namespace) []object.Object {
 	var objs []object.Object
-	// Can't wait until I forget about this
 	for _, exp := range exps {
 		evaluated := Eval(exp, ns)
 		if object.IsError(evaluated) {
@@ -262,7 +263,7 @@ func evalIdentifier(node *ast.Identifier, ns *object.Namespace) object.Object {
 		return builtin
 	}
 
-	return newError("Identifier not found: %s", node.Value)
+	return newEvaluationError("Identifier not found: %s", node.Value)
 }
 
 func evalYarStatementNode(node *ast.YarStatement, ns *object.Namespace) object.Object {
@@ -274,23 +275,16 @@ func evalYarStatementNode(node *ast.YarStatement, ns *object.Namespace) object.O
 	return &object.MT{}
 }
 
-func evalStatements(stmts []ast.Statement, ns *object.Namespace) object.Object {
-	var result object.Object
-	for _, statement := range stmts {
-		result = Eval(statement, ns)
-		if returnValue, ok := result.(*object.GivesValue); ok {
-			return returnValue.Value
-		}
-	}
-	return result
-}
-
 func evalGivesStatementNode(node *ast.GivesStatement, ns *object.Namespace) object.Object {
 	value := Eval(node.Value, ns)
 	if object.IsError(value) {
 		return value
 	}
 	return &object.GivesValue{Value: value}
+}
+
+func evalPortStatementNode() object.Object {
+	return newEvaluationError("Port statement not implemented yet.")
 }
 
 func evalForStatementNode(node *ast.ForStatement, ns *object.Namespace) object.Object {
@@ -300,7 +294,7 @@ func evalForStatementNode(node *ast.ForStatement, ns *object.Namespace) object.O
 	}
 
 	if condition.Type() != object.BOOL_OBJ {
-		return newError("For statement condition is not boolen. Got type=%s", condition.Type())
+		return newEvaluationError("4 statement condition is not boolen. Got type=%s", condition.Type())
 	}
 
 	for condition == AY {
@@ -376,10 +370,10 @@ func evalInfixExpressionNode(node *ast.InfixExpression, ns *object.Namespace) ob
 	case left.Type() == object.INT_OBJ && right.Type() == object.STRING_OBJ:
 		return evalStringInfixExpression(castIntToString(left), node.Operator, right)
 	case left.Type() != right.Type():
-		return newError("type mismatch: %s %s %s",
+		return newEvaluationError("type mismatch: %s %s %s",
 			left.Type(), node.Operator, right.Type())
 	default:
-		return newError("No infix expression for: %s %s %s",
+		return newEvaluationError("No infix expression for: %s %s %s",
 			left.Type(), node.Operator, right.Type())
 	}
 
@@ -390,7 +384,7 @@ func castIntToString(obj object.Object) object.Object {
 	if ok {
 		return &object.String{Value: strconv.FormatInt(intObj.Value, 10)}
 	}
-	return newError("Error while casting INT to STRING. Expected INT, got %s", obj.Type())
+	return newEvaluationError("Error while casting INT to STRING. Expected INT, got %s", obj.Type())
 
 }
 
@@ -399,14 +393,14 @@ func evalBoolInfixExpression(left object.Object, operator string, right object.O
 	switch operator {
 	case "=":
 		return nativeBoolToBoolObj(left == right)
-	case "!=":
+	case "<>":
 		return nativeBoolToBoolObj(left != right)
 	case "and":
 		return nativeBoolToBoolObj(left == AY && right == AY)
 	case "or":
 		return nativeBoolToBoolObj(left == AY || right == AY)
 	default:
-		return newError("unknown operator: %s %s %s",
+		return newEvaluationError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())
 	}
 }
@@ -420,10 +414,10 @@ func evalStringInfixExpression(left object.Object, operator string, right object
 		return nativeStringToStringObj(leftVal + rightVal)
 	case "=":
 		return nativeBoolToBoolObj(leftVal == rightVal)
-	case "!=":
+	case "<>":
 		return nativeBoolToBoolObj(leftVal != rightVal)
 	default:
-		return newError("unknown operator: %s %s %s",
+		return newEvaluationError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())
 	}
 }
@@ -439,18 +433,24 @@ func evalIntInfixExpression(left object.Object, operator string, right object.Ob
 		return nativeIntToIntObj(leftVal - rightVal)
 	case "*":
 		return nativeIntToIntObj(leftVal * rightVal)
+	case "mod":
+		return nativeIntToIntObj(leftVal % rightVal)
 	case "/":
 		return nativeIntToIntObj(leftVal / rightVal)
 	case "=":
 		return nativeBoolToBoolObj(leftVal == rightVal)
-	case "!=":
+	case "<>":
 		return nativeBoolToBoolObj(leftVal != rightVal)
 	case ">":
 		return nativeBoolToBoolObj(leftVal > rightVal)
 	case "<":
 		return nativeBoolToBoolObj(leftVal < rightVal)
+	case "<=":
+		return nativeBoolToBoolObj(leftVal <= rightVal)
+	case ">=":
+		return nativeBoolToBoolObj(leftVal >= rightVal)
 	default:
-		return newError("unknown operator: %s %s %s",
+		return newEvaluationError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())
 	}
 }
@@ -467,13 +467,13 @@ func evalPrefixExpressionNode(node *ast.PrefixExpression, ns *object.Namespace) 
 	case "-":
 		return evalMathmaticalNegateExpression(operand)
 	default:
-		return newError("unknown operator: %s%s", node.Operator, operand.Type())
+		return newEvaluationError("unknown operator: %s%s", node.Operator, operand.Type())
 	}
 }
 
 func evalMathmaticalNegateExpression(operand object.Object) object.Object {
 	if operand.Type() != object.INT_OBJ {
-		return newError("unknown operator: -%s", operand.Type())
+		return newEvaluationError("unknown operator: -%s", operand.Type())
 	}
 
 	new_val := operand.(*object.Int).Value * -1
@@ -482,7 +482,7 @@ func evalMathmaticalNegateExpression(operand object.Object) object.Object {
 
 func evalLogicalNegateExpression(operand object.Object) object.Object {
 	if operand.Type() != object.BOOL_OBJ {
-		return newError("Unsupported operation !%s", operand.Type())
+		return newEvaluationError("Unsupported operation !%s", operand.Type())
 	}
 
 	if operand == AY {
@@ -516,6 +516,6 @@ func evalProgramNode(program *ast.Program, ns *object.Namespace) object.Object {
 	return result
 }
 
-func newError(format string, a ...interface{}) *object.Error {
+func newEvaluationError(format string, a ...interface{}) *object.Error {
 	return &object.Error{Message: fmt.Sprintf(format, a...)}
 }

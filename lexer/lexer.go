@@ -4,11 +4,12 @@ package lexer
 import "pir-interpreter/token"
 
 type Lexer struct {
-	input        string
-	position     int
-	readPosition int
-	ch           byte
-	curLine      int
+	input         string
+	position      int
+	readPosition  int
+	ch            byte
+	curLine       int
+	curCharOfLine int
 }
 
 func (l *Lexer) readChar() {
@@ -19,6 +20,7 @@ func (l *Lexer) readChar() {
 	}
 	l.position = l.readPosition
 	l.readPosition++
+	l.curCharOfLine++
 }
 
 func (l *Lexer) peekNext() byte {
@@ -46,16 +48,24 @@ func (l *Lexer) NextToken() token.Token {
 	case '/':
 		currentToken = l.newToken(token.FSLASH, "/")
 	case '!':
+		currentToken = l.newToken(token.AAAA, "!")
+	case '<':
+		if l.peekNext() == '>' {
+			l.readChar()
+			currentToken = l.newToken(token.NOTEQUAL, "<>")
+		} else if l.peekNext() == '=' {
+			l.readChar()
+			currentToken = l.newToken(token.LESSEQ, "<=")
+		} else {
+			currentToken = l.newToken(token.LESS, "<")
+		}
+	case '>':
 		if l.peekNext() == '=' {
 			l.readChar()
-			currentToken = l.newToken(token.NOTEQUAL, "!=")
+			currentToken = l.newToken(token.GREATEREQ, ">=")
 		} else {
-			currentToken = l.newToken(token.AAAA, "!")
+			currentToken = l.newToken(token.GREATER, ">")
 		}
-	case '<':
-		currentToken = l.newToken(token.LESS, "<")
-	case '>':
-		currentToken = l.newToken(token.GREATER, ">")
 	case '=':
 		currentToken = l.newToken(token.EQUAL, "=")
 	case ',':
@@ -78,6 +88,8 @@ func (l *Lexer) NextToken() token.Token {
 		currentToken = l.newToken(token.LBRACKET, "[")
 	case ']':
 		currentToken = l.newToken(token.RBRACKET, "]")
+	case '4':
+		currentToken = l.newToken(token.FOR, "4")
 	case '\'', '"':
 		str := l.readString()
 		currentToken = l.newToken(token.STRING, str)
@@ -123,6 +135,7 @@ func (l *Lexer) ignoreWhitespace() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 		if l.ch == '\n' {
 			l.curLine += 1
+			l.curCharOfLine = 0
 		}
 		l.readChar()
 	}
@@ -154,7 +167,12 @@ func isCharNumber(ch byte) bool {
 }
 
 func (l *Lexer) newToken(tokenType token.TokenType, literal string) token.Token {
-	return token.Token{Type: tokenType, Literal: literal, LineNum: l.curLine}
+	return token.Token{
+		Type:    tokenType,
+		Literal: literal,
+		LineNum: l.curLine,
+		CharNum: l.curCharOfLine,
+	}
 }
 
 func New(input string) *Lexer {

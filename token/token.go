@@ -7,16 +7,19 @@ const (
 	IDENT = "IDENT" // add, foobar, x, y, ...
 	INT   = "INT"   // 1343456
 	// Operators
-	BE       = "BE"
-	PLUS     = "+"
-	MINUS    = "-"
-	STAR     = "*"
-	FSLASH   = "/"
-	AAAA     = "!"
-	LESS     = "<"
-	GREATER  = ">"
-	EQUAL    = "="
-	NOTEQUAL = "!="
+	BE        = "BE"
+	PLUS      = "+"
+	MINUS     = "-"
+	STAR      = "*"
+	FSLASH    = "/"
+	MOD       = "MOD"
+	AAAA      = "!"
+	LESS      = "<"
+	LESSEQ    = "<="
+	GREATER   = ">"
+	GREATEREQ = ">="
+	EQUAL     = "="
+	NOTEQUAL  = "<>"
 	// Delimiters
 	SQUOTE    = "'"
 	COMMA     = ","
@@ -41,8 +44,9 @@ const (
 	TRUE   = "TRUE"
 	FALSE  = "FALSE"
 	STRING = "STRING"
-	FOR    = "FOR"
+	FOR    = "4"
 	BREAK  = "BREAK"
+	PORT   = "PORT"
 )
 
 type TokenType string
@@ -51,6 +55,7 @@ type Token struct {
 	Type    TokenType
 	Literal string
 	LineNum int
+	CharNum int
 }
 
 func (tok *Token) Is(t TokenType) bool {
@@ -101,11 +106,11 @@ func (tok *Token) Precedence() int {
 		return PREC_LOGIC_OR
 	case AND:
 		return PREC_LOGIC_AND
-	case LESS, GREATER:
+	case LESS, GREATER, LESSEQ, GREATEREQ:
 		return PREC_LESSGREATER
 	case PLUS, MINUS:
 		return PREC_SUM
-	case FSLASH, STAR:
+	case FSLASH, STAR, MOD:
 		return PREC_PRODUCT
 	case LPAREN:
 		return PREC_CALL
@@ -140,10 +145,12 @@ func LookupIdent(ident string) TokenType {
 		return TRUE
 	case "nay":
 		return FALSE
-	case "for":
-		return FOR
 	case "break":
 		return BREAK
+	case "mod":
+		return MOD
+	case "port":
+		return PORT
 	default:
 		return IDENT
 	}

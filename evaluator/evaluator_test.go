@@ -18,14 +18,16 @@ func TestEvalIntegerExpression(t *testing.T) {
 		{"-10", -10},
 		{"-0", 0},
 		{"5 + 5", 10},
-		{"1 + 2 - 4", -1},
+		{"1 + 2 - 5", -2},
 		{"-50 + 100 + -50", 0},
 		{"5 * 2 + 10", 20},
 		{"5 + 2 * 10", 25},
+		{"5 mod 2 * 10", 10},
 		{"20 + 2 * -10", 0},
 		{"50 / 2 * 2 + 10", 60},
 		{"2 * (5 + 10)", 30},
 		{"3 * 3 * 3 + 10", 37},
+		{"3 mod 3 * 3 + 10", 10},
 		{"3 * (3 * 3) + 10", 37},
 		{"(5 + 10 * 2 + 15 / 3) * 2 + -10", 50},
 	}
@@ -66,15 +68,19 @@ func TestEvalBooleanExpression(t *testing.T) {
 		{"1 > 2", false},
 		{"1 < 1", false},
 		{"1 > 1", false},
+		{"1 <= 2", true},
+		{"1 >= 2", false},
+		{"1 <= 1", true},
+		{"1 >= 1", true},
 		{"1 = 1", true},
-		{"1 != 1", false},
+		{"1 <> 1", false},
 		{"1 = 2", false},
-		{"1 != 2", true},
+		{"1 <> 2", true},
 		{"ay = ay", true},
 		{"nay = nay", true},
 		{"ay = nay", false},
-		{"ay != nay", true},
-		{"nay != ay", true},
+		{"ay <> nay", true},
+		{"nay <> ay", true},
 		{"(1 < 2) = ay", true},
 		{"(1 < 2) = nay", false},
 		{"(1 > 2) = ay", false},
@@ -124,6 +130,62 @@ func TestAAAOperator(t *testing.T) {
 	}
 }
 
+/*
+func TestPortStatement(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{`
+			port a.
+			if 10 < 1:
+				port a.
+				gives 3.
+			.
+			gives 1.
+        `,
+			3,
+		},
+		{`
+			port a.
+			if 10 < 1:
+				port b.
+				gives 3.
+			.
+			gives 1.
+			port a.
+			gives 4.
+        `,
+			4,
+		},
+		{`
+			yar west be
+				f():
+					port t.
+					gives 0.
+				.
+			.
+
+			yar east be
+				f():
+					port t.
+					gives 1.
+				.
+			.
+
+			gives west().
+
+        `,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+*/
+
 func TestGivesStatements(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -132,7 +194,7 @@ func TestGivesStatements(t *testing.T) {
 		{"gives 1.", 1},
 		{"gives 1. 2.", 1},
 		{"gives 2 * 2. 5.", 4},
-		{"1. gives 2*4. 2.", 8},
+		{"1. gives 2*3. 2.", 6},
 		{
 			`
         if 10 > 1:
@@ -215,8 +277,8 @@ func TestErrorHandling(t *testing.T) {
 			"unknown operator: STRING - STRING",
 		},
 		{
-			"[1, 2, 3][4]",
-			"index out of bounds. len=3, index=4",
+			"[1, 2, 3][6]",
+			"index out of bounds. len=3, index=6",
 		},
 		{
 			"[1, 2, 3][-1]",
@@ -271,7 +333,7 @@ func TestFunctionObject(t *testing.T) {
 	if fn.Params[0].String() != "x" {
 		t.Fatalf("parameter is not 'x'. got=%q", fn.Params[0])
 	}
-	expectedBody := "(x + 2)"
+	expectedBody := "((x + 2).)"
 	if fn.Body.String() != expectedBody {
 		t.Fatalf("body is not %q. got=%q", expectedBody, fn.Body.String())
 	}
@@ -339,7 +401,7 @@ func TestStringCompare(t *testing.T) {
 		{"'hello' = 'hello'", true},
 		{"'hello' = \"hello\"", true},
 		{"'hello' = 'hlo'", false},
-		{"'hello' != 'hello'", false},
+		{"'hello' <> 'hello'", false},
 	}
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
@@ -457,7 +519,7 @@ func TestHashLiterals(t *testing.T) {
         "one": 10 - 9,
         two: 1 + 1,
         "thr" + "ee": 6 / 2,
-        4: 4,
+        3: 3,
         ay: 5,
         nay: 6
         }`
@@ -470,7 +532,7 @@ func TestHashLiterals(t *testing.T) {
 		(&object.String{Value: "one"}).Hash():   1,
 		(&object.String{Value: "two"}).Hash():   2,
 		(&object.String{Value: "three"}).Hash(): 3,
-		(&object.Int{Value: 4}).Hash():          4,
+		(&object.Int{Value: 3}).Hash():          3,
 		AY.Hash():                               5,
 		NAY.Hash():                              6,
 	}

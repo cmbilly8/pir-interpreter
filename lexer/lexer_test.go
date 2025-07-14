@@ -9,11 +9,12 @@ func TestNextToken(t *testing.T) {
 	input := `yar five be 5.
 	yar ten be 10.
 	yar add be f(x, y):
+		port t.
 		gives x + y..
 	yar result be add(five, ten).
     $ comment
 	!-/*5.
-	5 < 10 > 5.
+	4 < 10 > 5.
 	if 5 < 10:
 		gives ay.
 	ls:
@@ -22,6 +23,10 @@ func TestNextToken(t *testing.T) {
     'yes no'.
     [8, 3].
     {"ay": "matey"}.
+	a <> b.
+	a mod b.
+	a <= b.
+	a >= b.
 	`
 
 	tests := []struct {
@@ -48,6 +53,9 @@ func TestNextToken(t *testing.T) {
 		{token.IDENT, "y"},
 		{token.RPAREN, ")"},
 		{token.COLOGNE, ":"},
+		{token.PORT, "port"},
+		{token.IDENT, "t"},
+		{token.PERIOD, "."},
 		{token.GIVES, "gives"},
 		{token.IDENT, "x"},
 		{token.PLUS, "+"},
@@ -70,7 +78,7 @@ func TestNextToken(t *testing.T) {
 		{token.STAR, "*"},
 		{token.INT, "5"},
 		{token.PERIOD, "."},
-		{token.INT, "5"},
+		{token.FOR, "4"},
 		{token.LESS, "<"},
 		{token.INT, "10"},
 		{token.GREATER, ">"},
@@ -105,8 +113,25 @@ func TestNextToken(t *testing.T) {
 		{token.STRING, "matey"},
 		{token.RBRACE, "}"},
 		{token.PERIOD, "."},
+		{token.IDENT, "a"},
+		{token.NOTEQUAL, "<>"},
+		{token.IDENT, "b"},
+		{token.PERIOD, "."},
+		{token.IDENT, "a"},
+		{token.MOD, "mod"},
+		{token.IDENT, "b"},
+		{token.PERIOD, "."},
+		{token.IDENT, "a"},
+		{token.LESSEQ, "<="},
+		{token.IDENT, "b"},
+		{token.PERIOD, "."},
+		{token.IDENT, "a"},
+		{token.GREATEREQ, ">="},
+		{token.IDENT, "b"},
+		{token.PERIOD, "."},
 		{token.EOF, ""},
 	}
+
 	l := New(input)
 	for i, tt := range tests {
 		tok := l.NextToken()

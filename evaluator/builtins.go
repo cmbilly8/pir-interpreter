@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"math/rand"
 	"pir-interpreter/object"
 	"slices"
 )
@@ -26,6 +27,8 @@ func resolveBuiltin(id string) *object.Builtin {
 		builtin.Fn = ahoy
 	case "empty":
 		builtin.Fn = empty
+	case "maybe":
+		builtin.Fn = maybe
 	default:
 		return nil
 	}
@@ -36,7 +39,7 @@ func resolveBuiltin(id string) *object.Builtin {
 /*
 func name(args ...object.Object) object.Object {
 	if len(args) != 0 {
-		return newError("wrong number of args. got=%d, expected=0",
+		return newEvaluationError("wrong number of args. got=%d, expected=0",
 			len(args))
 	}
 
@@ -44,7 +47,7 @@ func name(args ...object.Object) object.Object {
 	case *object.SupportedArgType:
 		return &object.ObjectType{with logic}
 	default:
-		return newError("argument to `name` not supported, got %s",
+		return newEvaluationError("argument to `name` not supported, got %s",
 			args[0].Type())
 	}
 }
@@ -52,7 +55,7 @@ func name(args ...object.Object) object.Object {
 //arrays
 func len_f(args ...object.Object) object.Object {
 	if len(args) != 1 {
-		return newError("wrong number of args. got=%d, expected=1",
+		return newEvaluationError("wrong number of args. got=%d, expected=1",
 			len(args))
 	}
 
@@ -62,14 +65,14 @@ func len_f(args ...object.Object) object.Object {
 	case *object.Array:
 		return nativeIntToIntObj(int64(len(arg.Elements)))
 	default:
-		return newError("argument to `len` not supported, got %s",
+		return newEvaluationError("argument to `len` not supported, got %s",
 			args[0].Type())
 	}
 }
 
 func empty(args ...object.Object) object.Object {
 	if len(args) != 1 {
-		return newError("wrong number of args. got=%d, expected=1",
+		return newEvaluationError("wrong number of args. got=%d, expected=1",
 			len(args))
 	}
 
@@ -81,18 +84,18 @@ func empty(args ...object.Object) object.Object {
 		arg.Elements = make([]object.Object, 0)
 		return arg
 	default:
-		return newError("argument to `empty` not supported, got %s",
+		return newEvaluationError("argument to `empty` not supported, got %s",
 			args[0].Type())
 	}
 }
 
 func peek(args ...object.Object) object.Object {
 	if len(args) != 1 {
-		return newError("wrong number of arguments. got=%d, expected=1",
+		return newEvaluationError("wrong number of arguments. got=%d, expected=1",
 			len(args))
 	}
 	if args[0].Type() != object.ARRAY_OBJ {
-		return newError("argument to `peek` must be ARRAY, got %s",
+		return newEvaluationError("argument to `peek` must be ARRAY, got %s",
 			args[0].Type())
 	}
 	arr := args[0].(*object.Array)
@@ -104,11 +107,11 @@ func peek(args ...object.Object) object.Object {
 
 func pop(args ...object.Object) object.Object {
 	if len(args) != 1 {
-		return newError("wrong number of arguments. got=%d, expected=1",
+		return newEvaluationError("wrong number of arguments. got=%d, expected=1",
 			len(args))
 	}
 	if args[0].Type() != object.ARRAY_OBJ {
-		return newError("argument to `pop` must be ARRAY, got %s",
+		return newEvaluationError("argument to `pop` must be ARRAY, got %s",
 			args[0].Type())
 	}
 	arr := args[0].(*object.Array)
@@ -122,11 +125,11 @@ func pop(args ...object.Object) object.Object {
 
 func push(args ...object.Object) object.Object {
 	if len(args) != 2 {
-		return newError("wrong number of arguments. got=%d, expected=2",
+		return newEvaluationError("wrong number of arguments. got=%d, expected=2",
 			len(args))
 	}
 	if args[0].Type() != object.ARRAY_OBJ {
-		return newError("first argument to `push` must be ARRAY, got %s",
+		return newEvaluationError("first argument to `push` must be ARRAY, got %s",
 			args[0].Type())
 	}
 	arr := args[0].(*object.Array)
@@ -137,21 +140,21 @@ func push(args ...object.Object) object.Object {
 
 func insert(args ...object.Object) object.Object {
 	if len(args) != 3 {
-		return newError("wrong number of arguments. got=%d, expected=3",
+		return newEvaluationError("wrong number of arguments. got=%d, expected=3",
 			len(args))
 	}
 	if args[0].Type() != object.ARRAY_OBJ {
-		return newError("first argument to `insert` must be ARRAY, got %s",
+		return newEvaluationError("first argument to `insert` must be ARRAY, got %s",
 			args[0].Type())
 	}
 	if args[1].Type() != object.INT_OBJ {
-		return newError("second argument to `insert` must be INT, got %s",
+		return newEvaluationError("second argument to `insert` must be INT, got %s",
 			args[0].Type())
 	}
 	arr := args[0].(*object.Array)
 	i := args[1].(*object.Int).Value
 	if i < 0 || i > int64(len(arr.Elements))-1 {
-		return newError("index out of bound. index=%d, len=%d", i, len(arr.Elements))
+		return newEvaluationError("index out of bound. index=%d, len=%d", i, len(arr.Elements))
 	}
 	obj := args[2]
 	arr.Elements = slices.Insert(arr.Elements, int(i), obj)
@@ -160,10 +163,18 @@ func insert(args ...object.Object) object.Object {
 
 func isMT(args ...object.Object) object.Object {
 	if len(args) != 1 {
-		return newError("wrong number of arguments. got=%d, expected=1",
+		return newEvaluationError("wrong number of arguments. got=%d, expected=1",
 			len(args))
 	}
 	return nativeBoolToBoolObj(args[0] == MT)
+}
+
+func maybe(args ...object.Object) object.Object {
+	if len(args) > 0 {
+		return newEvaluationError("wrong number of arguments. got=%d, expected=0",
+			len(args))
+	}
+	return nativeBoolToBoolObj(rand.Intn(2) == 0)
 }
 
 func ahoy(args ...object.Object) object.Object {

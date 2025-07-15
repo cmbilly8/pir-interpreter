@@ -8,6 +8,7 @@ import (
 	"pir-interpreter/lexer"
 	"pir-interpreter/object"
 	"pir-interpreter/parser"
+	"pir-interpreter/writer"
 )
 
 const PROMPT = "8^) "
@@ -31,7 +32,10 @@ func Start(in io.Reader, out io.Writer) {
 		p := parser.New(l)
 		program := p.ParseProgram()
 		if len(p.Errors()) != 0 {
-			printParserErrors(out, p.Errors())
+			errors := p.Errors()
+			for _, msg := range errors {
+				writer.WriteOutput("\t" + msg + "\n")
+			}
 			continue
 		}
 
@@ -40,6 +44,7 @@ func Start(in io.Reader, out io.Writer) {
 			io.WriteString(out, evaluated.AsString())
 			io.WriteString(out, "\n")
 		}
+		fmt.Print(writer.GetOutput())
 	}
 }
 func printParserErrors(out io.Writer, errors []string) {

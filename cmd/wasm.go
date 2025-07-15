@@ -30,7 +30,7 @@ func evaluate(code string) {
 	writer.WriteOutput(evaluated.AsString())
 }
 
-func processInput(_ js.Value, args []js.Value) interface{} {
+func evalProgram(_ js.Value, args []js.Value) interface{} {
 	writer.ClearOutput()
 
 	if len(args) < 1 {
@@ -44,13 +44,13 @@ func processInput(_ js.Value, args []js.Value) interface{} {
 	return nil
 }
 
-func getOutput(_ js.Value, _ []js.Value) interface{} {
+func getProgramOutput(_ js.Value, _ []js.Value) interface{} {
 	return js.ValueOf(writer.GetOutput())
 }
 
 func main() {
-	js.Global().Set("processInput", js.FuncOf(processInput))
-	js.Global().Set("getOutput", js.FuncOf(getOutput))
+	js.Global().Set("evalProgram", js.FuncOf(evalProgram))
+	js.Global().Set("getProgramOutput", js.FuncOf(getProgramOutput))
 
 	select {}
 }

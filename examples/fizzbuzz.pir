@@ -6,7 +6,6 @@ i be 1.
 4 i < 100:
     line be "".
     y be 0.
-    $ Note to self, improve loops
     4 y < len(modPrecedences):
         yar divisor be modPrecedences[y].
         if i mod divisor = 0:

@@ -6,13 +6,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"pir-interpreter/evaluator"
 	"pir-interpreter/lexer"
 	"pir-interpreter/object"
 	"pir-interpreter/parser"
 	"pir-interpreter/repl"
+	"pir-interpreter/writer"
 )
 
 func main() {
@@ -41,20 +41,16 @@ func main() {
 	programTreeRoot := p.ParseProgram()
 
 	if len(p.Errors()) != 0 {
-		fmt.Println("Errors while parsing program:")
-		printParserErrors(os.Stdout, p.Errors())
-		os.Exit(1)
+		errors := p.Errors()
+		for _, msg := range errors {
+			writer.WriteOutput("\t" + msg + "\n")
+		}
 	}
 
 	ns := object.NewNamespace()
 	evaluated := evaluator.Eval(programTreeRoot, ns)
 	if evaluated.Type() != object.MT_OBJ {
-		fmt.Println(evaluated.AsString())
+		writer.WriteOutput(evaluated.AsString())
 	}
-}
-
-func printParserErrors(out io.Writer, errors []string) {
-	for _, msg := range errors {
-		io.WriteString(out, "\t"+msg+"\n")
-	}
+	fmt.Print(writer.GetOutput())
 }

@@ -1,9 +1,9 @@
 package evaluator
 
 import (
-	"fmt"
 	"math/rand"
 	"pir-interpreter/object"
+	"pir-interpreter/writer"
 	"slices"
 )
 
@@ -177,9 +177,20 @@ func maybe(args ...object.Object) object.Object {
 	return nativeBoolToBoolObj(rand.Intn(2) == 0)
 }
 
+/*
 func ahoy(args ...object.Object) object.Object {
 	for _, arg := range args {
 		fmt.Println(arg.AsString())
+	}
+	return MT
+}
+*/
+
+func ahoy(args ...object.Object) object.Object {
+	var str string
+	for _, arg := range args {
+		str = arg.AsString() + "\n"
+		writer.WriteOutput(str)
 	}
 	return MT
 }

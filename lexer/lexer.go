@@ -135,7 +135,7 @@ func (l *Lexer) ignoreWhitespace() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 		if l.ch == '\n' {
 			l.curLine += 1
-			l.curCharOfLine = 0
+			l.curCharOfLine = 1
 		}
 		l.readChar()
 	}
@@ -176,7 +176,7 @@ func (l *Lexer) newToken(tokenType token.TokenType, literal string) token.Token 
 }
 
 func New(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{input: input, curLine: 1, curCharOfLine: 1}
 	l.readChar()
 	return l
 }

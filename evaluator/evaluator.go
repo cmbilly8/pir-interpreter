@@ -109,7 +109,7 @@ func evalHashMapIndexAssignment(left, key, val object.Object) object.Object {
 			return newEvaluationError("Object not hashable: type=%T", key)
 		}
 		hashKey := preHashKey.Hash()
-		hashMap.MP[hashKey] = object.KVP{Key: key, Value: val}
+		hashMap.KVPs[hashKey] = object.KVP{Key: key, Value: val}
 	}
 	return MT
 }
@@ -134,7 +134,7 @@ func evalHashMapLiteralNode(node *ast.HashMapLiteral, ns *object.Namespace) obje
 		hashKey := preHashKey.Hash()
 		hm[hashKey] = object.KVP{Key: key, Value: value}
 	}
-	return &object.HashMap{MP: hm}
+	return &object.HashMap{KVPs: hm}
 }
 
 func evalIndexExpressionNode(node *ast.IndexExpression, ns *object.Namespace) object.Object {
@@ -166,7 +166,7 @@ func evalHashMapIndexExpression(hash, index object.Object) object.Object {
 	if !ok {
 		return newEvaluationError("Object not hashable. Type=%s", index.Type())
 	}
-	kvp, ok := hashObject.MP[key.Hash()]
+	kvp, ok := hashObject.KVPs[key.Hash()]
 	if !ok {
 		return MT
 	}

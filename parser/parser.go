@@ -308,6 +308,28 @@ func (p *Parser) parseFunctionParams() []*ast.Identifier {
 	return params
 }
 
+func (p *Parser) parseChestItemNames() []*ast.Identifier {
+	params := []*ast.Identifier{}
+	if p.peekToken.Is(token.PIPE) {
+		p.advanceTokens()
+		return params
+	}
+	p.advanceTokens()
+
+	params = append(params, &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal})
+	for p.peekToken.Is(token.COMMA) {
+		p.advanceTokens()
+		p.advanceTokens()
+		params = append(params, &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal})
+	}
+
+	if !p.expectPeekToken(token.RPAREN) {
+		return nil
+	}
+
+	return params
+}
+
 func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
 	exp := &ast.CallExpression{Token: p.curToken, Function: function}
 	exp.Arguments = p.parseExpressionCollection(token.RPAREN)

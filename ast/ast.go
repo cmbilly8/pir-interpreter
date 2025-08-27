@@ -60,15 +60,15 @@ type YarStatement struct {
 	Value Expression
 }
 
-func (ys *YarStatement) statementNode()       {}
-func (ys *YarStatement) TokenLiteral() string { return ys.Token.Literal }
-func (ys *YarStatement) String() string {
+func (cs *YarStatement) statementNode()       {}
+func (cs *YarStatement) TokenLiteral() string { return cs.Token.Literal }
+func (cs *YarStatement) String() string {
 	var out bytes.Buffer
-	out.WriteString(ys.TokenLiteral() + " ")
-	out.WriteString(ys.Name.String())
+	out.WriteString(cs.TokenLiteral() + " ")
+	out.WriteString(cs.Name.String())
 	out.WriteString(" be ")
-	if ys.Value != nil {
-		out.WriteString(ys.Value.String())
+	if cs.Value != nil {
+		out.WriteString(cs.Value.String())
 	}
 	out.WriteString(".")
 	return out.String()
@@ -355,12 +355,12 @@ type HashMapLiteral struct {
 	MP    map[Expression]Expression
 }
 
-func (hml *HashMapLiteral) expressionNode()      {}
-func (hml *HashMapLiteral) TokenLiteral() string { return hml.Token.Literal }
-func (hml *HashMapLiteral) String() string {
+func (tl *HashMapLiteral) expressionNode()      {}
+func (tl *HashMapLiteral) TokenLiteral() string { return tl.Token.Literal }
+func (tl *HashMapLiteral) String() string {
 	var out bytes.Buffer
 	pairs := []string{}
-	for key, value := range hml.MP {
+	for key, value := range tl.MP {
 		pairs = append(pairs, key.String()+":"+value.String())
 	}
 	out.WriteString("{")
@@ -383,5 +383,107 @@ func (fs *ForStatement) String() string {
 	out.WriteString(fs.Condition.String())
 	out.WriteString(": ")
 	out.Write([]byte(fs.Body.String()))
+	return out.String()
+}
+
+type ChestStatement struct {
+	Token     token.Token   // The 'chest' token
+	Name      *Identifier   // e.g. myChest
+	FieldList []*Identifier // e.g. [foo, bar]
+}
+
+func (cs *ChestStatement) statementNode()       {}
+func (cs *ChestStatement) TokenLiteral() string { return cs.Token.Literal }
+func (cs *ChestStatement) String() string {
+	var out bytes.Buffer
+	fields := []string{}
+	for _, f := range cs.FieldList {
+		fields = append(fields, f.String())
+	}
+	out.WriteString("chest ")
+	out.WriteString(cs.Name.String())
+	out.WriteString("|")
+	out.WriteString(strings.Join(fields, ", "))
+	out.WriteString("|.")
+	return out.String()
+}
+
+type ChestLiteral struct {
+	Token token.Token
+	Items map[*Identifier]Expression
+}
+
+func (tl *ChestLiteral) expressionNode()      {}
+func (tl *ChestLiteral) TokenLiteral() string { return tl.Token.Literal }
+func (tl *ChestLiteral) String() string {
+	var out bytes.Buffer
+	pairs := []string{}
+	for key, value := range tl.Items {
+		pairs = append(pairs, key.Value+":"+value.String())
+	}
+	out.WriteString("|")
+	out.WriteString(strings.Join(pairs, ", "))
+	out.WriteString("|")
+	return out.String()
+}
+
+type ChestInstantiation struct {
+	Token     token.Token
+	Chest     Expression
+	Arguments []Expression
+}
+
+func (ci *ChestInstantiation) expressionNode() {}
+func (ci *ChestInstantiation) TokenLiteral() string {
+	return ci.Token.Literal
+}
+func (ci *ChestInstantiation) String() string {
+	var out bytes.Buffer
+	args := []string{}
+	for _, a := range ci.Arguments {
+		args = append(args, a.String())
+	}
+	out.WriteString(ci.Chest.String())
+	out.WriteString("|")
+	out.WriteString(strings.Join(args, ", "))
+	out.WriteString("|")
+	return out.String()
+}
+
+type ChestAccess struct {
+	Token token.Token // The '|' token
+	Left  Expression
+	Field *Identifier
+}
+
+func (ca *ChestAccess) expressionNode()      {}
+func (ca *ChestAccess) TokenLiteral() string { return ca.Token.Literal }
+
+func (ca *ChestAccess) String() string {
+	var out bytes.Buffer
+	out.WriteString(ca.Left.String())
+	out.WriteString("|")
+	out.WriteString(ca.Field.String())
+	return out.String()
+}
+
+type ChestFieldAssignment struct {
+	Token token.Token
+	Left  Expression
+	Field *Identifier
+	Value Expression
+}
+
+func (ca *ChestFieldAssignment) statementNode()       {}
+func (ca *ChestFieldAssignment) TokenLiteral() string { return ca.Token.Literal }
+
+func (ca *ChestFieldAssignment) String() string {
+	var out bytes.Buffer
+	out.WriteString(ca.Left.String())
+	out.WriteString("|")
+	out.WriteString(ca.Field.String())
+	out.WriteString(" be ")
+	out.WriteString(ca.Value.String())
+	out.WriteString(".")
 	return out.String()
 }

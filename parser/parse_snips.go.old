@@ -1,0 +1,25 @@
+
+func (p *Parser) parseChestLiteral() ast.Expression {
+	cl := &ast.ChestLiteral{Token: p.curToken}
+	cl.Items = make(map[*ast.Identifier]ast.Expression)
+	for p.peekToken.IsNot(token.PIPE) {
+		if !p.expectPeekToken(token.IDENT) {
+			return nil
+		}
+		key := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+		if !p.expectPeekToken(token.COLOGNE) {
+			return nil
+		}
+		p.advanceTokens()
+		value := p.parseExpression(token.PREC_LOWEST)
+		cl.Items[key] = value
+		if p.peekToken.IsNot(token.PIPE) && !p.expectPeekToken(token.COMMA) {
+			return nil
+		}
+	}
+	if !p.expectPeekToken(token.PIPE) {
+		return nil
+	}
+	return cl
+}

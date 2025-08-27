@@ -27,6 +27,7 @@ func TestNextToken(t *testing.T) {
 	a mod b.
 	a <= b.
 	a >= b.
+	chest a |field|.
 	`
 
 	tests := []struct {
@@ -128,6 +129,12 @@ func TestNextToken(t *testing.T) {
 		{token.IDENT, "a"},
 		{token.GREATEREQ, ">="},
 		{token.IDENT, "b"},
+		{token.PERIOD, "."},
+		{token.CHEST, "chest"},
+		{token.IDENT, "a"},
+		{token.PIPE, "|"},
+		{token.IDENT, "field"},
+		{token.PIPE, "|"},
 		{token.PERIOD, "."},
 		{token.EOF, ""},
 	}

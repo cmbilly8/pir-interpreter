@@ -21,6 +21,7 @@ const (
 	ARRAY_OBJ       = "ARRAY"
 	HASHMAP_OBJ     = "HASHMAP"
 	BREAK_OBJ       = "BREAK"
+	CHEST_OBJ       = "CHEST"
 )
 
 type ObjectType string
@@ -177,7 +178,7 @@ type KVP struct {
 }
 
 type HashMap struct {
-	MP map[HashKey]KVP
+	KVPs map[HashKey]KVP
 }
 
 func (h *HashMap) Type() ObjectType { return HASHMAP_OBJ }
@@ -185,12 +186,31 @@ func (h *HashMap) Type() ObjectType { return HASHMAP_OBJ }
 func (h *HashMap) AsString() string {
 	var out bytes.Buffer
 	pairs := []string{}
-	for _, pair := range h.MP {
+	for _, pair := range h.KVPs {
 		pairs = append(pairs, fmt.Sprintf("%s: %s",
 			pair.Key.AsString(), pair.Value.AsString()))
 	}
 	out.WriteString("{")
 	out.WriteString(strings.Join(pairs, ", "))
 	out.WriteString("}")
+	return out.String()
+}
+
+type Chest struct {
+	Items map[String]Object
+}
+
+func (t *Chest) Type() ObjectType { return CHEST_OBJ }
+
+func (t *Chest) AsString() string {
+	var out bytes.Buffer
+	pairs := []string{}
+	for id, obj := range t.Items {
+		pairs = append(pairs, fmt.Sprintf("%s: %s",
+			id, obj.AsString()))
+	}
+	out.WriteString("|")
+	out.WriteString(strings.Join(pairs, ", "))
+	out.WriteString("|")
 	return out.String()
 }

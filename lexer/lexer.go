@@ -88,6 +88,8 @@ func (l *Lexer) NextToken() token.Token {
 		currentToken = l.newToken(token.LBRACKET, "[")
 	case ']':
 		currentToken = l.newToken(token.RBRACKET, "]")
+	case '|':
+		currentToken = l.newToken(token.PIPE, "|")
 	case '4':
 		currentToken = l.newToken(token.FOR, "4")
 	case '\'', '"':

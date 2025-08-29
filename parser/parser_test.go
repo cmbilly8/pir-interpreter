@@ -1162,6 +1162,47 @@ func TestChestInstantiationWithPositionalArgs(t *testing.T) {
 	}
 }
 
+func TestChestInstantiationWithNamedArgs(t *testing.T) {
+	input := `myChest|bar: "anotherBarVal", foo: "anotherFooVal"|.`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	inst, ok := stmt.Expression.(*ast.ChestInstantiation)
+	if !ok {
+		t.Fatalf("exp is not *ast.ChestInstantiation, got=%T", stmt.Expression)
+	}
+
+	if !testIdentifier(t, inst.Chest, "myChest") {
+		return
+	}
+
+	if len(inst.NamedArgs) != 2 {
+		t.Fatalf("ChestInstantiation.NamedArgs length expected 2, got=%d", len(inst.NamedArgs))
+	}
+
+	tests := map[string]string{
+		"foo": "anotherFooVal",
+		"bar": "anotherBarVal",
+	}
+
+	for _, arg := range inst.NamedArgs {
+		expected, ok := tests[arg.Name.Value]
+		if !ok {
+			t.Fatalf("unexpected named arg %s", arg.Name.Value)
+		}
+		sl, ok := arg.Value.(*ast.StringLiteral)
+		if !ok || sl.Value != expected {
+			t.Fatalf("arg %s wrong. expected %q, got=%T (%v)", arg.Name.Value, expected, arg.Value, arg.Value)
+		}
+	}
+
+	expected := `myChest|bar: "anotherBarVal", foo: "anotherFooVal"|`
+	if inst.String() != expected {
+		t.Fatalf("ChestInstantiation.String() mismatch. expected=%q, got=%q", expected, inst.String())
+	}
+}
+
 func TestChestInstantiationWithNestedExpressions(t *testing.T) {
 	input := `myChest|1 + 2, add(3, 4 * 5)|.`
 	program, p := parseProgramFromInput(input)

@@ -427,10 +427,16 @@ func (tl *ChestLiteral) String() string {
 	return out.String()
 }
 
+type ChestArgument struct {
+	Name  *Identifier
+	Value Expression
+}
+
 type ChestInstantiation struct {
 	Token     token.Token
 	Chest     Expression
 	Arguments []Expression
+	NamedArgs []*ChestArgument
 }
 
 func (ci *ChestInstantiation) expressionNode() {}
@@ -440,8 +446,14 @@ func (ci *ChestInstantiation) TokenLiteral() string {
 func (ci *ChestInstantiation) String() string {
 	var out bytes.Buffer
 	args := []string{}
-	for _, a := range ci.Arguments {
-		args = append(args, a.String())
+	if len(ci.NamedArgs) > 0 {
+		for _, a := range ci.NamedArgs {
+			args = append(args, a.Name.String()+": "+a.Value.String())
+		}
+	} else {
+		for _, a := range ci.Arguments {
+			args = append(args, a.String())
+		}
 	}
 	out.WriteString(ci.Chest.String())
 	out.WriteString("|")

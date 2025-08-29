@@ -1024,3 +1024,409 @@ func TestForStatementParsing(t *testing.T) {
 		}
 	}
 }
+
+func TestParsingChestLiteralWithExpressions(t *testing.T) {
+	input := `| field1: 2 * 3, field2: 1 + 2 |`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	ChestLiteral, ok := stmt.Expression.(*ast.ChestLiteral)
+	if !ok {
+		t.Fatalf("exp is not ast.ChestMapLiteral. got=%T", stmt.Expression)
+	}
+	if len(ChestLiteral.Items) != 2 {
+		t.Errorf("ChestLiteral.Items has wrong length. got=%d", len(ChestLiteral.Items))
+	}
+	tests := map[string]func(ast.Expression){
+		"field1": func(e ast.Expression) {
+			testInfixExpression(t, e, 2, "*", 3)
+		},
+		"field2": func(e ast.Expression) {
+			testInfixExpression(t, e, 1, "+", 2)
+		},
+	}
+	for id, value := range ChestLiteral.Items {
+		testFunc, ok := tests[id.Value]
+		if !ok {
+			t.Errorf("No test function for key %s found", id)
+			continue
+		}
+		testFunc(value)
+	}
+}
+
+func TestParsingChestAccess(t *testing.T) {
+	input := "myChest|itemo"
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	chestAccess, ok := stmt.Expression.(*ast.ChestAccess)
+	if !ok {
+		t.Fatalf("exp not *ast.ChestAccess. got=%T", stmt.Expression)
+	}
+	if !testLiteralExpression(t, chestAccess.Left, "myChest") {
+		return
+	}
+	if !testIdentifier(t, chestAccess.Field, "itemo") {
+		return
+	}
+}
+
+func TestChestStatementParsing(t *testing.T) {
+	input := "chest myChest|foo, bar|."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ChestStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.ChestStatement, got=%T", program.Statements[0])
+	}
+
+	if stmt.TokenLiteral() != "chest" {
+		t.Fatalf("ChestStatement.TokenLiteral not 'chest', got=%q", stmt.TokenLiteral())
+	}
+
+	if stmt.Name == nil || stmt.Name.Value != "myChest" {
+		t.Fatalf("ChestStatement.Name not 'myChest', got=%v", stmt.Name)
+	}
+
+	if len(stmt.FieldList) != 2 {
+		t.Fatalf("ChestStatement.FieldList length expected 2, got=%d", len(stmt.FieldList))
+	}
+	if !testIdentifier(t, stmt.FieldList[0], "foo") {
+		return
+	}
+	if !testIdentifier(t, stmt.FieldList[1], "bar") {
+		return
+	}
+
+	expected := "chest myChest|foo, bar|."
+	if stmt.String() != expected {
+		t.Fatalf("ChestStatement.String() mismatch. expected=%q, got=%q", expected, stmt.String())
+	}
+}
+
+func TestChestLiteralEmpty(t *testing.T) {
+	input := "||"
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	lit, ok := stmt.Expression.(*ast.ChestLiteral)
+	if !ok {
+		t.Fatalf("exp is not *ast.ChestLiteral, got=%T", stmt.Expression)
+	}
+	if len(lit.Items) != 0 {
+		t.Fatalf("ChestLiteral.Items length expected 0, got=%d", len(lit.Items))
+	}
+	if lit.String() != "||" {
+		t.Fatalf("ChestLiteral.String mismatch, expected %q, got %q", "||", lit.String())
+	}
+}
+
+func TestChestInstantiationWithPositionalArgs(t *testing.T) {
+	input := `myChest|"fooVal", "barVal"|.`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	inst, ok := stmt.Expression.(*ast.ChestInstantiation)
+	if !ok {
+		t.Fatalf("exp is not *ast.ChestInstantiation, got=%T", stmt.Expression)
+	}
+
+	if !testIdentifier(t, inst.Chest, "myChest") {
+		return
+	}
+	if len(inst.Arguments) != 2 {
+		t.Fatalf("ChestInstantiation.Arguments length expected 2, got=%d", len(inst.Arguments))
+	}
+
+	// Both are string literals
+	arg0, ok := inst.Arguments[0].(*ast.StringLiteral)
+	if !ok || arg0.Value != "fooVal" {
+		t.Fatalf("first arg not string 'fooVal', got=%T (%v)", inst.Arguments[0], inst.Arguments[0])
+	}
+	arg1, ok := inst.Arguments[1].(*ast.StringLiteral)
+	if !ok || arg1.Value != "barVal" {
+		t.Fatalf("second arg not string 'barVal', got=%T (%v)", inst.Arguments[1], inst.Arguments[1])
+	}
+
+	expected := `myChest|"fooVal", "barVal"|`
+	if inst.String() != expected {
+		t.Fatalf("ChestInstantiation.String() mismatch. expected=%q, got=%q", expected, inst.String())
+	}
+}
+
+func TestChestInstantiationWithNamedArgs(t *testing.T) {
+	input := `myChest|bar: "anotherBarVal", foo: "anotherFooVal"|.`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	inst, ok := stmt.Expression.(*ast.ChestInstantiation)
+	if !ok {
+		t.Fatalf("exp is not *ast.ChestInstantiation, got=%T", stmt.Expression)
+	}
+
+	if !testIdentifier(t, inst.Chest, "myChest") {
+		return
+	}
+
+	if len(inst.NamedArgs) != 2 {
+		t.Fatalf("ChestInstantiation.NamedArgs length expected 2, got=%d", len(inst.NamedArgs))
+	}
+
+	tests := map[string]string{
+		"foo": "anotherFooVal",
+		"bar": "anotherBarVal",
+	}
+
+	for _, arg := range inst.NamedArgs {
+		expected, ok := tests[arg.Name.Value]
+		if !ok {
+			t.Fatalf("unexpected named arg %s", arg.Name.Value)
+		}
+		sl, ok := arg.Value.(*ast.StringLiteral)
+		if !ok || sl.Value != expected {
+			t.Fatalf("arg %s wrong. expected %q, got=%T (%v)", arg.Name.Value, expected, arg.Value, arg.Value)
+		}
+	}
+
+	expected := `myChest|bar: "anotherBarVal", foo: "anotherFooVal"|`
+	if inst.String() != expected {
+		t.Fatalf("ChestInstantiation.String() mismatch. expected=%q, got=%q", expected, inst.String())
+	}
+}
+
+func TestChestInstantiationWithNestedExpressions(t *testing.T) {
+	input := `myChest|1 + 2, add(3, 4 * 5)|.`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	inst, ok := stmt.Expression.(*ast.ChestInstantiation)
+	if !ok {
+		t.Fatalf("exp is not *ast.ChestInstantiation, got=%T", stmt.Expression)
+	}
+
+	if len(inst.Arguments) != 2 {
+		t.Fatalf("ChestInstantiation.Arguments length expected 2, got=%d", len(inst.Arguments))
+	}
+
+	// 1 + 2
+	if !testInfixExpression(t, inst.Arguments[0], 1, "+", 2) {
+		return
+	}
+
+	// add(3, 4 * 5)
+	call, ok := inst.Arguments[1].(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("second arg not *ast.CallExpression, got=%T", inst.Arguments[1])
+	}
+	if !testIdentifier(t, call.Function, "add") {
+		return
+	}
+	if len(call.Arguments) != 2 {
+		t.Fatalf("call.Arguments length expected 2, got=%d", len(call.Arguments))
+	}
+	if !testIntegerLiteral(t, call.Arguments[0], 3) {
+		return
+	}
+	if !testInfixExpression(t, call.Arguments[1], 4, "*", 5) {
+		return
+	}
+}
+
+func TestChestInstantiationAssignedViaYar(t *testing.T) {
+	input := `yar inst be myChest|1, 2|.`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements length expected 1, got=%d", len(program.Statements))
+	}
+
+	stmt := program.Statements[0]
+	if !testYarStatement(t, stmt, "inst") {
+		return
+	}
+
+	inst, ok := stmt.(*ast.YarStatement).Value.(*ast.ChestInstantiation)
+	if !ok {
+		t.Fatalf("Yar value not *ast.ChestInstantiation, got=%T", stmt.(*ast.YarStatement).Value)
+	}
+	if !testIdentifier(t, inst.Chest, "myChest") {
+		return
+	}
+	if len(inst.Arguments) != 2 {
+		t.Fatalf("ChestInstantiation.Arguments length expected 2, got=%d", len(inst.Arguments))
+	}
+	if !testIntegerLiteral(t, inst.Arguments[0], 1) {
+		return
+	}
+	if !testIntegerLiteral(t, inst.Arguments[1], 2) {
+		return
+	}
+}
+
+func TestChestFieldAssignment_Int(t *testing.T) {
+	input := "instance|foo be 42."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements length expected 1, got=%d", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ChestFieldAssignment)
+	if !ok {
+		t.Fatalf("stmt not *ast.ChestFieldAssignment, got=%T", program.Statements[0])
+	}
+
+	if !testIdentifier(t, stmt.Left, "instance") {
+		return
+	}
+	if stmt.TokenLiteral() != "|" {
+		t.Fatalf("ChestFieldAssignment.TokenLiteral expected '|', got %q", stmt.TokenLiteral())
+	}
+	if !testIdentifier(t, stmt.Field, "foo") {
+		return
+	}
+	if !testIntegerLiteral(t, stmt.Value, 42) {
+		return
+	}
+
+	expected := "instance|foo be 42."
+	if stmt.String() != expected {
+		t.Fatalf("ChestFieldAssignment.String mismatch. expected=%q, got=%q", expected, stmt.String())
+	}
+}
+
+func TestChestFieldAssignment_String(t *testing.T) {
+	input := `instance|bar be "hello".`
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt, ok := program.Statements[0].(*ast.ChestFieldAssignment)
+	if !ok {
+		t.Fatalf("stmt not *ast.ChestFieldAssignment, got=%T", program.Statements[0])
+	}
+	if !testIdentifier(t, stmt.Left, "instance") {
+		return
+	}
+	if !testIdentifier(t, stmt.Field, "bar") {
+		return
+	}
+	lit, ok := stmt.Value.(*ast.StringLiteral)
+	if !ok || lit.Value != "hello" {
+		t.Fatalf("Value not string literal 'hello', got=%T (%v)", stmt.Value, stmt.Value)
+	}
+}
+
+func TestChestFieldAssignment_Expression(t *testing.T) {
+	input := "instance|baz be 1 + 2 * 3."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt, ok := program.Statements[0].(*ast.ChestFieldAssignment)
+	if !ok {
+		t.Fatalf("stmt not *ast.ChestFieldAssignment, got=%T", program.Statements[0])
+	}
+	if !testIdentifier(t, stmt.Left, "instance") {
+		return
+	}
+	if !testIdentifier(t, stmt.Field, "baz") {
+		return
+	}
+	if !testInfixExpression(t, stmt.Value, 1, "+", 2) {
+		// Value is likely (1 + (2 * 3)); check full precedence via String()
+		expected := "instance|baz be (1 + (2 * 3))."
+		if stmt.String() != expected {
+			t.Fatalf("ChestFieldAssignment nested expression mismatch. expected=%q, got=%q", expected, stmt.String())
+		}
+	}
+}
+
+func TestChestAccessChained(t *testing.T) {
+	input := "myChest|a|b."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	outer, ok := stmt.Expression.(*ast.ChestAccess)
+	if !ok {
+		t.Fatalf("exp not *ast.ChestAccess, got=%T", stmt.Expression)
+	}
+	// Left should itself be a ChestAccess of myChest|a
+	inner, ok := outer.Left.(*ast.ChestAccess)
+	if !ok {
+		t.Fatalf("outer.Left not *ast.ChestAccess, got=%T", outer.Left)
+	}
+	if !testIdentifier(t, inner.Left, "myChest") {
+		return
+	}
+	if !testIdentifier(t, inner.Field, "a") {
+		return
+	}
+	if !testIdentifier(t, outer.Field, "b") {
+		return
+	}
+}
+
+func TestChestAccessInInfixExpressionPrecedence(t *testing.T) {
+	input := "x + myChest|field."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	actual := program.String()
+	// Expect the right side to render as a chest access, wrapped by the infix printer
+	expected := "(x + myChest|field)"
+	if actual != expected {
+		t.Fatalf("precedence/String mismatch. expected=%q, got=%q", expected, actual)
+	}
+}
+
+func TestChestAccessAsCallArgument(t *testing.T) {
+	input := "ahoy(myChest|field)."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	call, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression not *ast.CallExpression, got=%T", stmt.Expression)
+	}
+	if len(call.Arguments) != 1 {
+		t.Fatalf("call.Arguments length wrong. expected=1, got=%d", len(call.Arguments))
+	}
+	if _, ok := call.Arguments[0].(*ast.ChestAccess); !ok {
+		t.Fatalf("argument not *ast.ChestAccess. got=%T", call.Arguments[0])
+	}
+}
+
+func TestChestAccessFollowedByCall(t *testing.T) {
+	input := "inst|foo()."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	call, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("exp not *ast.CallExpression, got=%T", stmt.Expression)
+	}
+	chestAccess, ok := call.Function.(*ast.ChestAccess)
+	if !ok {
+		t.Fatalf("call.Function not *ast.ChestAccess. got=%T", call.Function)
+	}
+	if !testIdentifier(t, chestAccess.Left, "inst") {
+		return
+	}
+	if !testIdentifier(t, chestAccess.Field, "foo") {
+		return
+	}
+}

@@ -21,6 +21,8 @@ const (
 	ARRAY_OBJ       = "ARRAY"
 	HASHMAP_OBJ     = "HASHMAP"
 	BREAK_OBJ       = "BREAK"
+	CHEST_TYPE_OBJ  = "CHEST_TYPE"
+	CHEST_OBJ       = "CHEST"
 )
 
 type ObjectType string
@@ -192,5 +194,41 @@ func (h *HashMap) AsString() string {
 	out.WriteString("{")
 	out.WriteString(strings.Join(pairs, ", "))
 	out.WriteString("}")
+	return out.String()
+}
+
+type Chest struct {
+	Items map[string]Object
+}
+
+func (t *Chest) Type() ObjectType { return CHEST_OBJ }
+
+func (t *Chest) AsString() string {
+	var out bytes.Buffer
+	pairs := []string{}
+	for id, obj := range t.Items {
+		val := obj.AsString()
+		if obj.Type() == STRING_OBJ {
+			val = fmt.Sprintf("\"%s\"", val)
+		}
+		pairs = append(pairs, fmt.Sprintf("%s: %s", id, val))
+	}
+	out.WriteString("|")
+	out.WriteString(strings.Join(pairs, ", "))
+	out.WriteString("|")
+	return out.String()
+}
+
+type ChestType struct {
+	Fields []string
+}
+
+func (ct *ChestType) Type() ObjectType { return CHEST_TYPE_OBJ }
+
+func (ct *ChestType) AsString() string {
+	var out bytes.Buffer
+	out.WriteString("chest|")
+	out.WriteString(strings.Join(ct.Fields, ", "))
+	out.WriteString("|")
 	return out.String()
 }

@@ -625,3 +625,82 @@ func TestIndexAssign(t *testing.T) {
 		}
 	}
 }
+
+func TestChestStatementInstantiationAndAccess(t *testing.T) {
+	input := `
+chest myChest|foo, bar|.
+yar inst be myChest|"fooVal", 5|.
+inst|bar.
+`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}
+
+func TestChestInstantiationWithNamedArgs(t *testing.T) {
+	input := `
+chest myChest|foo, bar|.
+yar anotherInstance be myChest|bar: "anotherBarVal", foo: "anotherFooVal"|.
+anotherInstance|foo.
+`
+	evaluated := testEval(input)
+	str, ok := evaluated.(*object.String)
+	if !ok {
+		t.Fatalf("object not String. got=%T", evaluated)
+	}
+	if str.Value != "anotherFooVal" {
+		t.Fatalf("string wrong. expected=%q, got=%q", "anotherFooVal", str.Value)
+	}
+}
+
+func TestChestLiteral(t *testing.T) {
+	input := `|foo: 1, bar: 2|`
+	evaluated := testEval(input)
+	chest, ok := evaluated.(*object.Chest)
+	if !ok {
+		t.Fatalf("object not Chest. got=%T", evaluated)
+	}
+	testIntegerObject(t, chest.Items["foo"], 1)
+	testIntegerObject(t, chest.Items["bar"], 2)
+}
+
+func TestChestFieldAssignment(t *testing.T) {
+	input := `
+chest myChest|foo, bar|.
+yar inst be myChest|1, 2|.
+inst|foo be 10.
+inst|foo.
+`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10)
+}
+
+func TestChestAsStringQuotesStrings(t *testing.T) {
+	input := `
+chest it|yes|.
+yar b be it|"one"|.
+b.
+`
+	evaluated := testEval(input)
+	chest, ok := evaluated.(*object.Chest)
+	if !ok {
+		t.Fatalf("object not Chest. got=%T", evaluated)
+	}
+	expected := `|yes: "one"|`
+	actual := chest.AsString()
+	if actual != expected {
+		t.Fatalf("chest AsString wrong. expected=%q, got=%q", expected, actual)
+	}
+}
+
+func TestChestFunctionFieldCall(t *testing.T) {
+	input := `
+chest myChest|foo|.
+yar funco be f():
+    gives 5.
+.
+yar inst be myChest|funco|.
+inst|foo().
+`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}

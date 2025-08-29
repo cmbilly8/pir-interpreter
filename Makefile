@@ -40,9 +40,13 @@ build: $(OUT_DIR)
 wasm: $(OUT_DIR)
 	GOOS=js GOARCH=wasm go build -o $(WASM_OUTPUT) $(CMD_DIR)
 
-run: build
+repl: build
 	chmod +x ./$(NATIVE_OUTPUT)
 	./$(NATIVE_OUTPUT) -r
+
+run: build
+	chmod +x ./$(NATIVE_OUTPUT)
+	./$(NATIVE_OUTPUT) $(FILE)
 
 clean:
 	go clean

@@ -56,6 +56,16 @@ func Eval(node ast.Node, ns *object.Namespace) object.Object {
 		return nativeStringToStringObj(node.Value)
 	case *ast.HashMapLiteral:
 		return evalHashMapLiteralNode(node, ns)
+	case *ast.ChestLiteral:
+		return evalChestLiteralNode(node, ns)
+	case *ast.ChestInstantiation:
+		return evalChestInstantiationNode(node, ns)
+	case *ast.ChestAccess:
+		return evalChestAccessNode(node, ns)
+	case *ast.ChestStatement:
+		return evalChestStatementNode(node, ns)
+	case *ast.ChestFieldAssignment:
+		return evalChestFieldAssignmentNode(node, ns)
 	case *ast.BreakStatement:
 		return BREAK
 	}
@@ -194,6 +204,111 @@ func evalArrayLiteralNode(node *ast.ArrayLiteral, ns *object.Namespace) object.O
 
 func nativeStringToStringObj(str string) object.Object {
 	return &object.String{Value: str}
+}
+
+func evalChestLiteralNode(node *ast.ChestLiteral, ns *object.Namespace) object.Object {
+	items := make(map[string]object.Object)
+	for id, expr := range node.Items {
+		val := Eval(expr, ns)
+		if object.IsError(val) {
+			return val
+		}
+		items[id.Value] = val
+	}
+	return &object.Chest{Items: items}
+}
+
+func evalChestStatementNode(node *ast.ChestStatement, ns *object.Namespace) object.Object {
+	fields := make([]string, len(node.FieldList))
+	for i, f := range node.FieldList {
+		fields[i] = f.Value
+	}
+	ct := &object.ChestType{Fields: fields}
+	ns.Set(node.Name.Value, ct)
+	return MT
+}
+
+func evalChestInstantiationNode(node *ast.ChestInstantiation, ns *object.Namespace) object.Object {
+	chestObj := Eval(node.Chest, ns)
+	if object.IsError(chestObj) {
+		return chestObj
+	}
+	chestType, ok := chestObj.(*object.ChestType)
+	if !ok {
+		return newEvaluationError("not a chest type: %s", chestObj.Type())
+	}
+	if len(node.NamedArgs) > 0 {
+		if len(node.NamedArgs) != len(chestType.Fields) {
+			return newEvaluationError("wrong number of fields. expected=%d, got=%d", len(chestType.Fields), len(node.NamedArgs))
+		}
+		items := make(map[string]object.Object)
+		for _, arg := range node.NamedArgs {
+			val := Eval(arg.Value, ns)
+			if object.IsError(val) {
+				return val
+			}
+			name := arg.Name.Value
+			found := false
+			for _, f := range chestType.Fields {
+				if f == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return newEvaluationError("unknown field: %s", name)
+			}
+			items[name] = val
+		}
+		if len(items) != len(chestType.Fields) {
+			return newEvaluationError("wrong number of fields. expected=%d, got=%d", len(chestType.Fields), len(items))
+		}
+		return &object.Chest{Items: items}
+	}
+	args := evalExpressions(node.Arguments, ns)
+	if len(args) == 1 && object.IsError(args[0]) {
+		return args[0]
+	}
+	if len(args) != len(chestType.Fields) {
+		return newEvaluationError("wrong number of fields. expected=%d, got=%d", len(chestType.Fields), len(args))
+	}
+	items := make(map[string]object.Object)
+	for i, name := range chestType.Fields {
+		items[name] = args[i]
+	}
+	return &object.Chest{Items: items}
+}
+
+func evalChestAccessNode(node *ast.ChestAccess, ns *object.Namespace) object.Object {
+	left := Eval(node.Left, ns)
+	if object.IsError(left) {
+		return left
+	}
+	chest, ok := left.(*object.Chest)
+	if !ok {
+		return newEvaluationError("not a chest: %s", left.Type())
+	}
+	if val, ok := chest.Items[node.Field.Value]; ok {
+		return val
+	}
+	return MT
+}
+
+func evalChestFieldAssignmentNode(node *ast.ChestFieldAssignment, ns *object.Namespace) object.Object {
+	left := Eval(node.Left, ns)
+	if object.IsError(left) {
+		return left
+	}
+	chest, ok := left.(*object.Chest)
+	if !ok {
+		return newEvaluationError("not a chest: %s", left.Type())
+	}
+	val := Eval(node.Value, ns)
+	if object.IsError(val) {
+		return val
+	}
+	chest.Items[node.Field.Value] = val
+	return MT
 }
 
 func evalFuncCallNode(node *ast.CallExpression, ns *object.Namespace) object.Object {

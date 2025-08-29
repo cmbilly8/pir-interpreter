@@ -32,6 +32,7 @@ const (
 	RBRACE    = "}"
 	LBRACKET  = "["
 	RBRACKET  = "]"
+	PIPE      = "|"
 	// Keywords
 	F      = "F"
 	YAR    = "YAR"
@@ -47,6 +48,7 @@ const (
 	FOR    = "4"
 	BREAK  = "BREAK"
 	PORT   = "PORT"
+	CHEST  = "CHEST"
 )
 
 type TokenType string
@@ -151,6 +153,8 @@ func LookupIdent(ident string) TokenType {
 		return MOD
 	case "port":
 		return PORT
+	case "chest":
+		return CHEST
 	default:
 		return IDENT
 	}

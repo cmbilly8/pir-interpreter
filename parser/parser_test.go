@@ -1349,3 +1349,21 @@ func TestChestAccessInInfixExpressionPrecedence(t *testing.T) {
 		t.Fatalf("precedence/String mismatch. expected=%q, got=%q", expected, actual)
 	}
 }
+
+func TestChestAccessAsCallArgument(t *testing.T) {
+	input := "ahoy(myChest|field)."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	call, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression not *ast.CallExpression, got=%T", stmt.Expression)
+	}
+	if len(call.Arguments) != 1 {
+		t.Fatalf("call.Arguments length wrong. expected=1, got=%d", len(call.Arguments))
+	}
+	if _, ok := call.Arguments[0].(*ast.ChestAccess); !ok {
+		t.Fatalf("argument not *ast.ChestAccess. got=%T", call.Arguments[0])
+	}
+}

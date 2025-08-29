@@ -657,3 +657,21 @@ inst|foo.
 	evaluated := testEval(input)
 	testIntegerObject(t, evaluated, 10)
 }
+
+func TestChestAsStringQuotesStrings(t *testing.T) {
+	input := `
+chest it|yes|.
+yar b be it|"one"|.
+b.
+`
+	evaluated := testEval(input)
+	chest, ok := evaluated.(*object.Chest)
+	if !ok {
+		t.Fatalf("object not Chest. got=%T", evaluated)
+	}
+	expected := `|yes: "one"|`
+	actual := chest.AsString()
+	if actual != expected {
+		t.Fatalf("chest AsString wrong. expected=%q, got=%q", expected, actual)
+	}
+}

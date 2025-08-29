@@ -449,6 +449,7 @@ func isChestAccessTerminator(t token.TokenType) bool {
 	case token.PERIOD, token.BE, token.PLUS, token.MINUS, token.FSLASH,
 		token.STAR, token.MOD, token.EQUAL, token.NOTEQUAL, token.AND,
 		token.OR, token.LESS, token.GREATER, token.LESSEQ, token.GREATEREQ,
+		token.RPAREN, token.RBRACKET, token.RBRACE, token.COMMA,
 		token.EOF:
 		return true
 	default:

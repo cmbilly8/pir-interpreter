@@ -435,10 +435,40 @@ func (p *Parser) parseChestAccessOrInstantiation(left ast.Expression) ast.Expres
 	}
 	// Otherwise parse as instantiation
 	inst := &ast.ChestInstantiation{Token: pipeTok, Chest: left}
-	inst.Arguments = p.parseExpressionCollection(token.PIPE)
-	for _, a := range inst.Arguments {
-		if sl, ok := a.(*ast.StringLiteral); ok {
-			sl.Token.Literal = "\"" + sl.Token.Literal + "\""
+
+	// Determine if named arguments are used
+	if p.peekToken.Is(token.IDENT) && p.peekToken2.Is(token.COLOGNE) {
+		inst.NamedArgs = []*ast.ChestArgument{}
+		for p.peekToken.IsNot(token.PIPE) {
+			p.advanceTokens() // current at identifier
+			keyLiteral := p.curToken.Literal
+			if p.peekToken.Is(token.INT) {
+				keyLiteral += p.peekToken.Literal
+				p.advanceTokens()
+			}
+			name := &ast.Identifier{Token: token.Token{Type: token.IDENT, Literal: keyLiteral}, Value: keyLiteral}
+			if !p.expectPeekToken(token.COLOGNE) {
+				return nil
+			}
+			p.advanceTokens()
+			value := p.parseExpression(token.PREC_LOWEST)
+			if sl, ok := value.(*ast.StringLiteral); ok {
+				sl.Token.Literal = "\"" + sl.Token.Literal + "\""
+			}
+			inst.NamedArgs = append(inst.NamedArgs, &ast.ChestArgument{Name: name, Value: value})
+			if p.peekToken.IsNot(token.PIPE) && !p.expectPeekToken(token.COMMA) {
+				return nil
+			}
+		}
+		if !p.expectPeekToken(token.PIPE) {
+			return nil
+		}
+	} else {
+		inst.Arguments = p.parseExpressionCollection(token.PIPE)
+		for _, a := range inst.Arguments {
+			if sl, ok := a.(*ast.StringLiteral); ok {
+				sl.Token.Literal = "\"" + sl.Token.Literal + "\""
+			}
 		}
 	}
 	return inst

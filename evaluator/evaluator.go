@@ -237,6 +237,34 @@ func evalChestInstantiationNode(node *ast.ChestInstantiation, ns *object.Namespa
 	if !ok {
 		return newEvaluationError("not a chest type: %s", chestObj.Type())
 	}
+	if len(node.NamedArgs) > 0 {
+		if len(node.NamedArgs) != len(chestType.Fields) {
+			return newEvaluationError("wrong number of fields. expected=%d, got=%d", len(chestType.Fields), len(node.NamedArgs))
+		}
+		items := make(map[string]object.Object)
+		for _, arg := range node.NamedArgs {
+			val := Eval(arg.Value, ns)
+			if object.IsError(val) {
+				return val
+			}
+			name := arg.Name.Value
+			found := false
+			for _, f := range chestType.Fields {
+				if f == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return newEvaluationError("unknown field: %s", name)
+			}
+			items[name] = val
+		}
+		if len(items) != len(chestType.Fields) {
+			return newEvaluationError("wrong number of fields. expected=%d, got=%d", len(chestType.Fields), len(items))
+		}
+		return &object.Chest{Items: items}
+	}
 	args := evalExpressions(node.Arguments, ns)
 	if len(args) == 1 && object.IsError(args[0]) {
 		return args[0]

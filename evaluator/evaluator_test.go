@@ -636,6 +636,22 @@ inst|bar.
 	testIntegerObject(t, evaluated, 5)
 }
 
+func TestChestInstantiationWithNamedArgs(t *testing.T) {
+	input := `
+chest myChest|foo, bar|.
+yar anotherInstance be myChest|bar: "anotherBarVal", foo: "anotherFooVal"|.
+anotherInstance|foo.
+`
+	evaluated := testEval(input)
+	str, ok := evaluated.(*object.String)
+	if !ok {
+		t.Fatalf("object not String. got=%T", evaluated)
+	}
+	if str.Value != "anotherFooVal" {
+		t.Fatalf("string wrong. expected=%q, got=%q", "anotherFooVal", str.Value)
+	}
+}
+
 func TestChestLiteral(t *testing.T) {
 	input := `|foo: 1, bar: 2|`
 	evaluated := testEval(input)

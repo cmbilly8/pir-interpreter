@@ -426,7 +426,7 @@ func (p *Parser) parseChestAccessOrInstantiation(left ast.Expression) ast.Expres
 	if p.peekToken.Is(token.IDENT) {
 		t2 := p.peekToken2.Type
 		t3 := p.peekToken3.Type
-		if isChestAccessTerminator(t2) || (p.peekToken2.Is(token.PIPE) && t3 == token.IDENT) {
+		if isChestAccessTerminator(t2) || t2 == token.LPAREN || t2 == token.LBRACKET || (p.peekToken2.Is(token.PIPE) && t3 == token.IDENT) {
 			p.advanceTokens()
 			fieldTok := p.curToken
 			ident := &ast.Identifier{Token: fieldTok, Value: fieldTok.Literal}

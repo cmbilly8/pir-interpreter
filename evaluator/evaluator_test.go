@@ -691,3 +691,16 @@ b.
 		t.Fatalf("chest AsString wrong. expected=%q, got=%q", expected, actual)
 	}
 }
+
+func TestChestFunctionFieldCall(t *testing.T) {
+	input := `
+chest myChest|foo|.
+yar funco be f():
+    gives 5.
+.
+yar inst be myChest|funco|.
+inst|foo().
+`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}

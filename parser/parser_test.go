@@ -1408,3 +1408,25 @@ func TestChestAccessAsCallArgument(t *testing.T) {
 		t.Fatalf("argument not *ast.ChestAccess. got=%T", call.Arguments[0])
 	}
 }
+
+func TestChestAccessFollowedByCall(t *testing.T) {
+	input := "inst|foo()."
+	program, p := parseProgramFromInput(input)
+	printErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	call, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("exp not *ast.CallExpression, got=%T", stmt.Expression)
+	}
+	chestAccess, ok := call.Function.(*ast.ChestAccess)
+	if !ok {
+		t.Fatalf("call.Function not *ast.ChestAccess. got=%T", call.Function)
+	}
+	if !testIdentifier(t, chestAccess.Left, "inst") {
+		return
+	}
+	if !testIdentifier(t, chestAccess.Field, "foo") {
+		return
+	}
+}

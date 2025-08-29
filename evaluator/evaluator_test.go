@@ -625,3 +625,35 @@ func TestIndexAssign(t *testing.T) {
 		}
 	}
 }
+
+func TestChestStatementInstantiationAndAccess(t *testing.T) {
+	input := `
+chest myChest|foo, bar|.
+yar inst be myChest|"fooVal", 5|.
+inst|bar.
+`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}
+
+func TestChestLiteral(t *testing.T) {
+	input := `|foo: 1, bar: 2|`
+	evaluated := testEval(input)
+	chest, ok := evaluated.(*object.Chest)
+	if !ok {
+		t.Fatalf("object not Chest. got=%T", evaluated)
+	}
+	testIntegerObject(t, chest.Items["foo"], 1)
+	testIntegerObject(t, chest.Items["bar"], 2)
+}
+
+func TestChestFieldAssignment(t *testing.T) {
+	input := `
+chest myChest|foo, bar|.
+yar inst be myChest|1, 2|.
+inst|foo be 10.
+inst|foo.
+`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 10)
+}

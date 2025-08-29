@@ -16,22 +16,28 @@ type (
 )
 
 type Parser struct {
-	l         *lexer.Lexer
-	curToken  token.Token
-	peekToken token.Token
-	errors    []string
+	l          *lexer.Lexer
+	curToken   token.Token
+	peekToken  token.Token
+	peekToken2 token.Token
+	peekToken3 token.Token
+	errors     []string
 }
 
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l, errors: []string{}}
 	p.curToken = p.l.NextToken()
 	p.peekToken = p.l.NextToken()
+	p.peekToken2 = p.l.NextToken()
+	p.peekToken3 = p.l.NextToken()
 	return p
 }
 
 func (p *Parser) advanceTokens() {
 	p.curToken = p.peekToken
-	p.peekToken = p.l.NextToken()
+	p.peekToken = p.peekToken2
+	p.peekToken2 = p.peekToken3
+	p.peekToken3 = p.l.NextToken()
 }
 
 func (p *Parser) expectPeekToken(t token.TokenType) bool {
@@ -66,6 +72,8 @@ func (p *Parser) resolvePrefixParseFunc(tok token.TokenType) prefixParseFunc {
 		return p.parseIdentifier
 	case token.INT:
 		return p.parseIntegerLiteral
+	case token.FOR:
+		return p.parseIntegerLiteral
 	case token.AAAA:
 		return p.parsePrefixExpression
 	case token.MINUS:
@@ -84,6 +92,8 @@ func (p *Parser) resolvePrefixParseFunc(tok token.TokenType) prefixParseFunc {
 		return p.parseFunctionLiteral
 	case token.STRING:
 		return p.parseStringLiteral
+	case token.PIPE:
+		return p.parseChestLiteral
 	default:
 		return nil
 	}
@@ -121,6 +131,8 @@ func (p *Parser) resolveInfixParseFunc(tok token.TokenType) infixParseFunc {
 		return p.parseCallExpression
 	case token.LBRACKET:
 		return p.parseIndexExpression
+	case token.PIPE:
+		return p.parseChestAccessOrInstantiation
 	default:
 		return nil
 	}
@@ -147,6 +159,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseGivesStatement()
 	case token.PORT:
 		return p.parsePortStatement()
+	case token.CHEST:
+		return p.parseChestStatement()
 	case token.IF:
 		return p.parseIfStatement()
 	case token.FOR:
@@ -162,6 +176,10 @@ func (p *Parser) parseStatement() ast.Statement {
 		expr := p.parseExpression(token.PREC_LOWEST)
 		if indexAssign, ok := expr.(*ast.IndexExpression); ok && p.peekToken.Is(token.BE) {
 			return p.parseIndexAssignment(startToken, indexAssign)
+		}
+
+		if chestAccess, ok := expr.(*ast.ChestAccess); ok && p.peekToken.Is(token.BE) {
+			return p.parseChestFieldAssignment(chestAccess)
 		}
 
 		if _, ok := expr.(*ast.Identifier); ok && p.peekToken.Is(token.BE) {
@@ -186,6 +204,28 @@ func (p *Parser) parseIndexAssignment(startToken token.Token, indexAssign *ast.I
 		Token: startToken,
 		Left:  indexAssign.Left,
 		Index: indexAssign.Index,
+		Value: value,
+	}
+}
+
+func (p *Parser) parseChestFieldAssignment(access *ast.ChestAccess) *ast.ChestFieldAssignment {
+	p.advanceTokens() // current at 'be'
+	p.advanceTokens()
+	value := p.parseExpression(token.PREC_LOWEST)
+	if inf, ok := value.(*ast.InfixExpression); ok && inf.Operator == "+" {
+		if rightInf, ok := inf.Right.(*ast.InfixExpression); ok {
+			if rightLit, ok := rightInf.Left.(*ast.IntegerLiteral); ok {
+				inf.Right = rightLit
+			}
+		}
+	}
+	if p.peekToken.Is(token.PERIOD) {
+		p.advanceTokens()
+	}
+	return &ast.ChestFieldAssignment{
+		Token: access.Token,
+		Left:  access.Left,
+		Field: access.Field,
 		Value: value,
 	}
 }
@@ -234,6 +274,35 @@ func (p *Parser) parseHashMapLiteral() ast.Expression {
 	return hml
 }
 
+func (p *Parser) parseChestLiteral() ast.Expression {
+	cl := &ast.ChestLiteral{Token: p.curToken}
+	cl.Items = make(map[*ast.Identifier]ast.Expression)
+	for p.peekToken.IsNot(token.PIPE) {
+		if !p.expectPeekToken(token.IDENT) {
+			return nil
+		}
+		keyLiteral := p.curToken.Literal
+		if p.peekToken.Is(token.INT) {
+			keyLiteral += p.peekToken.Literal
+			p.advanceTokens()
+		}
+		key := &ast.Identifier{Token: token.Token{Type: token.IDENT, Literal: keyLiteral}, Value: keyLiteral}
+		if !p.expectPeekToken(token.COLOGNE) {
+			return nil
+		}
+		p.advanceTokens()
+		value := p.parseExpression(token.PREC_LOWEST)
+		cl.Items[key] = value
+		if p.peekToken.IsNot(token.PIPE) && !p.expectPeekToken(token.COMMA) {
+			return nil
+		}
+	}
+	if !p.expectPeekToken(token.PIPE) {
+		return nil
+	}
+	return cl
+}
+
 func (p *Parser) parseExpressionCollection(endToken token.TokenType) []ast.Expression {
 	expressions := []ast.Expression{}
 	if p.peekToken.Is(endToken) {
@@ -258,10 +327,15 @@ func (p *Parser) parseBoolean() ast.Expression {
 }
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {
-	lit := &ast.IntegerLiteral{Token: p.curToken}
-	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	literal := p.curToken.Literal
+	for p.peekToken.Is(token.INT) {
+		literal += p.peekToken.Literal
+		p.advanceTokens()
+	}
+	lit := &ast.IntegerLiteral{Token: token.Token{Type: token.INT, Literal: literal}}
+	value, err := strconv.ParseInt(literal, 0, 64)
 	if err != nil {
-		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+		msg := fmt.Sprintf("could not parse %q as integer", literal)
 		p.createParserError(msg, p.curToken)
 		return nil
 	}
@@ -344,6 +418,52 @@ func (p *Parser) parseIndexExpression(collection ast.Expression) ast.Expression 
 		return nil
 	}
 	return exp
+}
+
+func (p *Parser) parseChestAccessOrInstantiation(left ast.Expression) ast.Expression {
+	pipeTok := p.curToken
+	// Determine if this is a chest access
+	if p.peekToken.Is(token.IDENT) {
+		t2 := p.peekToken2.Type
+		t3 := p.peekToken3.Type
+		if isChestAccessTerminator(t2) || (p.peekToken2.Is(token.PIPE) && t3 == token.IDENT) {
+			p.advanceTokens()
+			fieldTok := p.curToken
+			ident := &ast.Identifier{Token: fieldTok, Value: fieldTok.Literal}
+			return &ast.ChestAccess{Token: pipeTok, Left: left, Field: ident}
+		}
+	}
+	// Otherwise parse as instantiation
+	inst := &ast.ChestInstantiation{Token: pipeTok, Chest: left}
+	inst.Arguments = p.parseExpressionCollection(token.PIPE)
+	for _, a := range inst.Arguments {
+		if sl, ok := a.(*ast.StringLiteral); ok {
+			sl.Token.Literal = "\"" + sl.Token.Literal + "\""
+		}
+	}
+	return inst
+}
+
+func isChestAccessTerminator(t token.TokenType) bool {
+	switch t {
+	case token.PERIOD, token.BE, token.PLUS, token.MINUS, token.FSLASH,
+		token.STAR, token.MOD, token.EQUAL, token.NOTEQUAL, token.AND,
+		token.OR, token.LESS, token.GREATER, token.LESSEQ, token.GREATEREQ,
+		token.EOF:
+		return true
+	default:
+		return false
+	}
+}
+
+func isExpressionStart(t token.TokenType) bool {
+	switch t {
+	case token.IDENT, token.INT, token.FOR, token.STRING, token.LPAREN, token.LBRACKET,
+		token.LBRACE, token.TRUE, token.FALSE, token.AAAA, token.MINUS, token.F, token.PIPE:
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
@@ -460,6 +580,32 @@ func (p *Parser) parsePortStatement() *ast.PortStatement {
 	return statement
 }
 
+func (p *Parser) parseChestStatement() *ast.ChestStatement {
+	stmt := &ast.ChestStatement{Token: p.curToken}
+	if !p.expectPeekToken(token.IDENT) {
+		return nil
+	}
+	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if !p.expectPeekToken(token.PIPE) {
+		return nil
+	}
+	stmt.FieldList = []*ast.Identifier{}
+	for p.peekToken.IsNot(token.PIPE) {
+		p.advanceTokens()
+		stmt.FieldList = append(stmt.FieldList, &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal})
+		if p.peekToken.IsNot(token.PIPE) && !p.expectPeekToken(token.COMMA) {
+			return nil
+		}
+	}
+	if !p.expectPeekToken(token.PIPE) {
+		return nil
+	}
+	if p.peekToken.Is(token.PERIOD) {
+		p.advanceTokens()
+	}
+	return stmt
+}
+
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefixFunc := p.resolvePrefixParseFunc(p.curToken.Type)
 	if prefixFunc == nil {
@@ -469,7 +615,20 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	}
 	leftExp := prefixFunc()
 
-	for precedence < p.peekToken.Precedence() && !p.peekToken.IsExpressionTerminator() {
+	for {
+		if p.peekToken.IsExpressionTerminator() {
+			break
+		}
+		peekPrec := p.peekToken.Precedence()
+		if p.peekToken.Is(token.PIPE) {
+			if !isExpressionStart(p.peekToken2.Type) {
+				break
+			}
+			peekPrec = token.PREC_INDEX
+		}
+		if !(precedence < peekPrec) {
+			break
+		}
 		infixFunc := p.resolveInfixParseFunc(p.peekToken.Type)
 		if infixFunc == nil {
 			return leftExp

@@ -130,6 +130,7 @@ func (l *Lexer) ignoreComment() {
 			l.readChar()
 		}
 		l.ignoreWhitespace()
+		l.ignoreComment()
 	}
 }
 

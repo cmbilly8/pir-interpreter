@@ -207,8 +207,11 @@ func (t *Chest) AsString() string {
 	var out bytes.Buffer
 	pairs := []string{}
 	for id, obj := range t.Items {
-		pairs = append(pairs, fmt.Sprintf("%s: %s",
-			id, obj.AsString()))
+		val := obj.AsString()
+		if obj.Type() == STRING_OBJ {
+			val = fmt.Sprintf("\"%s\"", val)
+		}
+		pairs = append(pairs, fmt.Sprintf("%s: %s", id, val))
 	}
 	out.WriteString("|")
 	out.WriteString(strings.Join(pairs, ", "))
